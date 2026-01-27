@@ -1,0 +1,19 @@
+@startuml Demande de maintenance
+title Demande de maintenance informatique
+
+actor Client
+actor Agent
+actor Technicien
+participant "Système F-PRO" as SYS
+database DB
+participant "Service Notification" as NOTIF
+
+Client -> SYS : Soumettre demande maintenance
+SYS -> DB : Enregistrer demande
+Agent -> SYS : Consulter demandes
+Agent -> SYS : Affecter technicien
+SYS -> Technicien : Notifier intervention
+Technicien -> SYS : Mettre à jour statut
+SYS -> DB : Enregistrer rapport
+SYS -> NOTIF : Notifier client
+@enduml

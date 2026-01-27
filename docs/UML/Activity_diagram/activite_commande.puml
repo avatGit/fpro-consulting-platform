@@ -1,0 +1,20 @@
+@startuml Activité_ Commande de produits
+title Activité : Commande de produits
+
+start
+:Client se connecte;
+:Consulter produits;
+:Ajouter au panier;
+:Générer devis;
+
+if (Devis accepté ?) then (Oui)
+  :Confirmer commande;
+  :Enregistrer commande;
+  :Mettre à jour stock;
+  :Envoyer confirmation;
+else (Non)
+  :Annuler commande;
+endif
+
+stop
+@enduml
