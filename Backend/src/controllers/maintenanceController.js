@@ -1,0 +1,49 @@
+const maintenanceService = require('../services/maintenanceService');
+const ResponseHandler = require('../utils/responseHandler');
+
+class MaintenanceController {
+    async createRequest(req, res) {
+        try {
+            const request = await maintenanceService.createRequest(req.userId, req.user.company_id || req.body.companyId, req.body);
+            return ResponseHandler.created(res, request, 'Demande de maintenance créée');
+        } catch (error) {
+            return ResponseHandler.serverError(res, error);
+        }
+    }
+
+    async getRequest(req, res) {
+        try {
+            const { id } = req.params;
+            const request = await maintenanceService.getRequestDetails(id);
+            return ResponseHandler.success(res, request, 'Détails de la demande récupérés');
+        } catch (error) {
+            if (error.message === 'Demande de maintenance non trouvée') {
+                return ResponseHandler.notFound(res, error.message);
+            }
+            return ResponseHandler.serverError(res, error);
+        }
+    }
+
+    async assignTechnician(req, res) {
+        try {
+            const { id } = req.params;
+            const { technicianId } = req.body;
+            const request = await maintenanceService.assignTechnician(id, technicianId);
+            return ResponseHandler.success(res, request, 'Technicien assigné avec succès');
+        } catch (error) {
+            return ResponseHandler.error(res, error.message, 400);
+        }
+    }
+
+    async autoAssign(req, res) {
+        try {
+            const { id } = req.params;
+            const request = await maintenanceService.autoAssign(id);
+            return ResponseHandler.success(res, request, 'Technicien assigné automatiquement');
+        } catch (error) {
+            return ResponseHandler.error(res, error.message, 400);
+        }
+    }
+}
+
+module.exports = new MaintenanceController();

@@ -7,6 +7,7 @@ const { testConnection } = require('./config/database');
 const { syncModels } = require('./models');
 const ResponseHandler = require('./utils/responseHandler');
 const logger = require('./utils/logger');
+const { swaggerUi, specs } = require('./config/swagger');
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -66,7 +67,7 @@ app.get('/api/health', async (req, res) => {
   try {
     // Vérifier la connexion à la base de données
     await sequelize.authenticate();
-    
+
     ResponseHandler.success(res, {
       status: 'healthy',
       database: 'connected',
@@ -90,8 +91,26 @@ app.get('/api/health', async (req, res) => {
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
 
-// ============================================
-// GESTION DES ERREURS 404
+// Documentation API
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(specs));
+
+// Routes Cart, Quote, Order (Sprint 3)
+const cartRoutes = require('./routes/cartRoutes');
+const quoteRoutes = require('./routes/quoteRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+
+app.use('/api/cart', cartRoutes);
+app.use('/api/quotes', quoteRoutes);
+app.use('/api/orders', orderRoutes);
+
+// Routes Maintenance, Intervention, Rental (Sprint 4)
+const maintenanceRoutes = require('./routes/maintenanceRoutes');
+const interventionRoutes = require('./routes/interventionRoutes');
+const rentalRoutes = require('./routes/rentalRoutes');
+
+app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/interventions', interventionRoutes);
+app.use('/api/rentals', rentalRoutes);
 // ============================================
 
 app.use((req, res) => {
@@ -105,7 +124,7 @@ app.use((req, res) => {
 app.use((err, req, res, next) => {
   logger.error(`Error: ${err.message}`);
   logger.error(err.stack);
-  
+
   // Erreur de validation Sequelize
   if (err.name === 'SequelizeValidationError') {
     const errors = err.errors.map(e => ({
@@ -114,21 +133,21 @@ app.use((err, req, res, next) => {
     }));
     return ResponseHandler.validationError(res, errors);
   }
-  
+
   // Erreur de contrainte unique Sequelize
   if (err.name === 'SequelizeUniqueConstraintError') {
     return ResponseHandler.error(res, 'Cette ressource existe déjà', 409);
   }
-  
+
   // Erreur JWT
   if (err.name === 'JsonWebTokenError') {
     return ResponseHandler.unauthorized(res, 'Token invalide');
   }
-  
+
   if (err.name === 'TokenExpiredError') {
     return ResponseHandler.unauthorized(res, 'Token expiré');
   }
-  
+
   // Erreur générique
   ResponseHandler.serverError(res, err);
 });
@@ -144,19 +163,19 @@ const startServer = async () => {
     // 1. Tester la connexion à PostgreSQL
     logger.info('🔌 Connexion à la base de données...');
     const isConnected = await testConnection();
-    
+
     if (!isConnected) {
       logger.error('❌ Impossible de démarrer le serveur sans connexion à la base de données');
       process.exit(1);
     }
-    
+
     // 2. Synchroniser les modèles (uniquement en développement)
     if (process.env.NODE_ENV === 'development') {
       logger.info('🔄 Synchronisation des modèles...');
       await syncModels({ alter: true }); // alter: true pour mettre à jour la structure
       logger.info('📊 Base de données synchronisée avec succès');
     }
-    
+
     // 3. Démarrer le serveur Express
     app.listen(PORT, () => {
       logger.info('='.repeat(50));
@@ -166,7 +185,7 @@ const startServer = async () => {
       logger.info(`📊 Base de données: ${process.env.DB_NAME}`);
       logger.info('='.repeat(50));
     });
-    
+
   } catch (error) {
     logger.error('❌ Erreur critique lors du démarrage du serveur:');
     logger.error(error);
