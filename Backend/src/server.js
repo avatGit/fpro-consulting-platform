@@ -172,7 +172,7 @@ const startServer = async () => {
     // 2. Synchroniser les modèles (uniquement en développement)
     if (process.env.NODE_ENV === 'development') {
       logger.info('🔄 Synchronisation des modèles...');
-      await syncModels({ alter: true }); // alter: true pour mettre à jour la structure
+      await syncModels({ alter: false }); // Changé de true à false pour éviter les erreurs de syntaxe Postgres
       logger.info('📊 Base de données synchronisée avec succès');
     }
 
