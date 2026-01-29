@@ -9,7 +9,6 @@ const Technician = sequelize.define('Technician', {
     },
     user_id: {
         type: DataTypes.UUID,
-        unique: true,
         allowNull: false,
         references: {
             model: 'users',
@@ -32,7 +31,13 @@ const Technician = sequelize.define('Technician', {
     }
 }, {
     tableName: 'technicians',
-    underscored: true
+    underscored: true,
+    indexes: [
+        {
+            unique: true,
+            fields: ['user_id']
+        }
+    ]
 });
 
 module.exports = Technician;

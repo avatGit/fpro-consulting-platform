@@ -9,7 +9,6 @@ const Order = sequelize.define('Order', {
     },
     order_number: {
         type: DataTypes.STRING(20),
-        unique: true,
         allowNull: false,
         comment: 'Format O-YYYY-000001'
     },
@@ -67,7 +66,14 @@ const Order = sequelize.define('Order', {
     }
 }, {
     tableName: 'orders',
-    underscored: true
+    underscored: true,
+    indexes: [
+        {
+            unique: true,
+            fields: ['order_number']
+        }
+    ]
 });
 
 module.exports = Order;
+

@@ -10,7 +10,6 @@ const InterventionReport = sequelize.define('InterventionReport', {
     intervention_id: {
         type: DataTypes.UUID,
         allowNull: false,
-        unique: true,
         references: {
             model: 'interventions',
             key: 'id'
@@ -35,7 +34,13 @@ const InterventionReport = sequelize.define('InterventionReport', {
     }
 }, {
     tableName: 'intervention_reports',
-    underscored: true
+    underscored: true,
+    indexes: [
+        {
+            unique: true,
+            fields: ['intervention_id']
+        }
+    ]
 });
 
 module.exports = InterventionReport;

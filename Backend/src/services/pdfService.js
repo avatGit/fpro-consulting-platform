@@ -1,4 +1,4 @@
-const PdfPrinter = require('pdfmake');
+const PdfPrinter = require('pdfmake/js/Printer').default;
 const path = require('path');
 const fs = require('fs');
 
@@ -6,10 +6,10 @@ class PdfService {
     constructor() {
         const fonts = {
             Roboto: {
-                normal: path.join(__dirname, '../templates/fonts/Roboto-Regular.ttf'),
-                bold: path.join(__dirname, '../templates/fonts/Roboto-Medium.ttf'),
-                italics: path.join(__dirname, '../templates/fonts/Roboto-Italic.ttf'),
-                bolditalics: path.join(__dirname, '../templates/fonts/Roboto-MediumItalic.ttf')
+                normal: path.join(__dirname, '../../node_modules/pdfmake/fonts/Roboto/Roboto-Regular.ttf'),
+                bold: path.join(__dirname, '../../node_modules/pdfmake/fonts/Roboto/Roboto-Medium.ttf'),
+                italics: path.join(__dirname, '../../node_modules/pdfmake/fonts/Roboto/Roboto-Italic.ttf'),
+                bolditalics: path.join(__dirname, '../../node_modules/pdfmake/fonts/Roboto/Roboto-MediumItalic.ttf')
             }
         };
         this.printer = new PdfPrinter(fonts);

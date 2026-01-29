@@ -7,14 +7,14 @@ const options = {
         info: {
             title: 'F-PRO CONSULTING API',
             version: '1.0.0',
-            description: 'API Documentation for Sprints 3 & 4 - Sales, Maintenance & Rental',
+            description: 'API Documentation',
             contact: {
                 name: 'F-PRO Team'
             }
         },
         servers: [
             {
-                url: 'http://localhost:5000',
+                url: 'http://localhost:4000',
                 description: 'Development server'
             }
         ],

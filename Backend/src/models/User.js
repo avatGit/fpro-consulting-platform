@@ -21,7 +21,6 @@ const User = sequelize.define('User', {
   email: {
     type: DataTypes.STRING(255),
     allowNull: false,
-    unique: true,
     validate: {
       isEmail: true
     },
@@ -48,10 +47,9 @@ const User = sequelize.define('User', {
     comment: 'Numéro de téléphone'
   },
   role: {
-    type: DataTypes.ENUM('admin', 'client', 'agent', 'technicien'),
+    type: DataTypes.ENUM('admin', 'client', 'agent', 'technicien', 'technician'),
     allowNull: false,
-    defaultValue: 'client',
-    comment: 'Rôle de l\'utilisateur dans le système'
+    defaultValue: 'client'
   },
   is_active: {
     type: DataTypes.BOOLEAN,
@@ -78,7 +76,14 @@ const User = sequelize.define('User', {
   timestamps: true,
   underscored: true,
   createdAt: 'created_at',
+  createdAt: 'created_at',
   updatedAt: 'updated_at',
+  indexes: [
+    {
+      unique: true,
+      fields: ['email']
+    }
+  ],
   hooks: {
     // Hook avant création : hasher le mot de passe
     beforeCreate: async (user) => {
@@ -98,12 +103,12 @@ const User = sequelize.define('User', {
 });
 
 // Méthode d'instance : comparer le mot de passe
-User.prototype.comparePassword = async function(candidatePassword) {
+User.prototype.comparePassword = async function (candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password_hash);
 };
 
 // Méthode d'instance : obtenir le profil public (sans le mot de passe)
-User.prototype.toJSON = function() {
+User.prototype.toJSON = function () {
   const values = Object.assign({}, this.get());
   delete values.password_hash;
   return values;

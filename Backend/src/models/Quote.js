@@ -9,7 +9,6 @@ const Quote = sequelize.define('Quote', {
     },
     quote_number: {
         type: DataTypes.STRING(20),
-        unique: true,
         allowNull: false,
         comment: 'Format Q-YYYY-000001'
     },
@@ -66,7 +65,13 @@ const Quote = sequelize.define('Quote', {
     }
 }, {
     tableName: 'quotes',
-    underscored: true
+    underscored: true,
+    indexes: [
+        {
+            unique: true,
+            fields: ['quote_number']
+        }
+    ]
 });
 
 module.exports = Quote;

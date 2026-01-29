@@ -15,7 +15,6 @@ const Company = sequelize.define('Company', {
   },
   siret: {
     type: DataTypes.STRING(14),
-    unique: true,
     allowNull: true,
     validate: {
       len: [14, 14]
@@ -50,17 +49,40 @@ const Company = sequelize.define('Company', {
   email: {
     type: DataTypes.STRING(255),
     allowNull: false,
-    unique: true,
     validate: {
       isEmail: true
     },
     comment: 'Email de contact de l\'entreprise'
   },
+
   website: {
     type: DataTypes.STRING(255),
     allowNull: true,
+    defaultValue: null,
     validate: {
-      isUrl: true
+      isURL: {
+        // Options du validateur
+        protocols: ['http', 'https'],
+        require_protocol: false,  // Accepte "www.site.com"
+        require_host: true,
+        allow_underscores: true,
+
+        allow_null: true,
+        allow_blank: true
+      }
+    },
+    set(value) {
+      // Nettoie la valeur avant sauvegarde
+      if (value === '' || value === null || value === undefined) {
+        this.setDataValue('website', null);
+      } else {
+        // Enlève les espaces, ajoute http:// si absent
+        let cleaned = value.trim();
+        if (!cleaned.startsWith('http://') && !cleaned.startsWith('https://')) {
+          cleaned = 'https://' + cleaned;
+        }
+        this.setDataValue('website', cleaned);
+      }
     },
     comment: 'Site web de l\'entreprise'
   },
@@ -84,7 +106,17 @@ const Company = sequelize.define('Company', {
   timestamps: true,
   underscored: true,
   createdAt: 'created_at',
-  updatedAt: 'updated_at'
+  updatedAt: 'updated_at',
+  indexes: [
+    {
+      unique: true,
+      fields: ['siret']
+    },
+    {
+      unique: true,
+      fields: ['email']
+    }
+  ]
 });
 
 module.exports = Company;

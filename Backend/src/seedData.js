@@ -1,6 +1,6 @@
 const { Product, Company, User, Technician, sequelize } = require('./models');
 const bcrypt = require('bcrypt');
-const { v4: uuidv4 } = require('uuid');
+/* const { v4: uuidv4 } = require('uuid'); */
 
 const seedData = async () => {
     const transaction = await sequelize.transaction();
@@ -15,23 +15,27 @@ const seedData = async () => {
         }, { transaction });
 
         // 2. Create an Admin User
-        const adminPassword = await bcrypt.hash('Admin@123', 10);
+        /*         const adminPassword = await bcrypt.hash('Admin@123', 10); */
         const admin = await User.create({
-            email: 'admin@fpro.com',
-            password_hash: adminPassword,
+            email: 'dankfd99@gmail.com',
+            password_hash: 'Admin@123',
             first_name: 'Super',
             last_name: 'Admin',
-            role: 'admin'
+            role: 'admin',
+            company_id: null,
+            is_active: true
         }, { transaction });
 
+
         // 3. Create a Technician User & Profile
-        const techPassword = await bcrypt.hash('Tech@123', 10);
         const techUser = await User.create({
             email: 'tech1@fpro.com',
-            password_hash: techPassword,
+            password_hash: 'Tech@123',
             first_name: 'Tenga',
             last_name: 'Zoundi',
-            role: 'technicien'
+            role: 'technician',
+            company_id: company.id,
+            is_active: true
         }, { transaction });
 
         await Technician.create({
@@ -68,10 +72,10 @@ const seedData = async () => {
         ], { transaction });
 
         await transaction.commit();
-        console.log('✅ Seed data successfully inserted');
+        console.log(' Seed data successfully inserted');
     } catch (error) {
         await transaction.rollback();
-        console.error('❌ Error seeding data:', error);
+        console.error(' Error seeding data:', error);
     }
 };
 

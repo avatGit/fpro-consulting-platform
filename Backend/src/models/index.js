@@ -14,6 +14,9 @@ const Intervention = require('./Intervention');
 const InterventionReport = require('./InterventionReport');
 const Rental = require('./Rental');
 const RentalItem = require('./RentalItem');
+const Notification = require('./Notification');
+const NotificationTemplate = require('./NotificationTemplate');
+const NotificationLog = require('./NotificationLog');
 
 // ============================================
 // DÉFINITION DES RELATIONS
@@ -94,6 +97,13 @@ RentalItem.belongsTo(Rental, { foreignKey: 'rental_id', as: 'rental' });
 Product.hasMany(RentalItem, { foreignKey: 'product_id', as: 'rental_items' });
 RentalItem.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
 
+// --- Notifications ---
+User.hasMany(Notification, { foreignKey: 'user_id', as: 'notifications', onDelete: 'CASCADE' });
+Notification.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
+Notification.hasMany(NotificationLog, { foreignKey: 'notification_id', as: 'logs', onDelete: 'CASCADE' });
+NotificationLog.belongsTo(Notification, { foreignKey: 'notification_id', as: 'notification' });
+
 // ============================================
 // SYNCHRONISATION
 // ============================================
@@ -129,5 +139,8 @@ module.exports = {
   InterventionReport,
   Rental,
   RentalItem,
+  Notification,
+  NotificationTemplate,
+  NotificationLog,
   syncModels
 };

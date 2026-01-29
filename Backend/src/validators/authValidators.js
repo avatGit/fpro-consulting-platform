@@ -25,7 +25,7 @@ const registerSchema = Joi.object({
         'string.email': 'Email entreprise invalide',
         'string.empty': 'L\'email de l\'entreprise est requis'
       }),
-    website: Joi.string().uri().optional()
+    website: Joi.string().uri().allow('', null).optional()
   }).required(),
 
   // Informations utilisateur
@@ -116,7 +116,7 @@ const validate = (schema) => {
         field: detail.path.join('.'),
         message: detail.message
       }));
-      
+
       return res.status(422).json({
         success: false,
         message: 'Erreur de validation',

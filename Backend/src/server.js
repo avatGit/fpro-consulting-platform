@@ -8,16 +8,15 @@ const { syncModels } = require('./models');
 const ResponseHandler = require('./utils/responseHandler');
 const logger = require('./utils/logger');
 const { swaggerUi, specs } = require('./config/swagger');
+const { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
+const { sanitizeAll, blockMaliciousInput } = require('./middleware/sanitizer');
+const cronService = require('./services/cronService');
 
 // Charger les variables d'environnement
 dotenv.config();
 
 // Initialiser l'application Express
 const app = express();
-
-// ============================================
-// MIDDLEWARES DE SÉCURITÉ
-// ============================================
 
 // Helmet - Sécurise les headers HTTP
 app.use(helmet());
@@ -30,16 +29,27 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// ============================================
+
 // MIDDLEWARES DE PARSING
-// ============================================
+
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ============================================
+
+// SECURITY MIDDLEWARE (Sprint 6)
+
+
+// Rate limiting - Apply to all API routes
+app.use('/api/', apiLimiter);
+
+// Input sanitization - Prevent XSS and injection attacks
+app.use(sanitizeAll);
+app.use(blockMaliciousInput);
+
+
 // LOGGING
-// ============================================
+
 
 // Morgan - Logs des requêtes HTTP
 if (process.env.NODE_ENV === 'development') {
@@ -48,9 +58,9 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('combined'));
 }
 
-// ============================================
+
 // ROUTES DE BASE
-// ============================================
+
 
 // Route de santé (Health Check)
 app.get('/', (req, res) => {
@@ -83,13 +93,13 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// ============================================
-// ROUTES API
-// ============================================
 
-// Routes d'authentification
+// ROUTES API
+
+
+// Routes d'authentification (with strict rate limiting)
 const authRoutes = require('./routes/authRoutes');
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
 
 // Documentation API
 app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(specs));
@@ -111,15 +121,39 @@ const rentalRoutes = require('./routes/rentalRoutes');
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/interventions', interventionRoutes);
 app.use('/api/rentals', rentalRoutes);
-// ============================================
+
+// Routes Notifications (Sprint 5)
+// Routes Notifications (Sprint 5)
+const notificationRoutes = require('./routes/notificationRoutes');
+app.use('/api/notifications', notificationRoutes);
+
+
+// MANAGEMENT ROUTES (Critical Gaps Fixed)
+
+
+// Product Management
+const productRoutes = require('./routes/productRoutes');
+app.use('/api/products', productRoutes);
+
+// Admin User Management
+const adminUserRoutes = require('./routes/adminUserRoutes');
+app.use('/api/admin/users', adminUserRoutes);
+
+// Company Management
+const companyRoutes = require('./routes/companyRoutes');
+app.use('/api/companies', companyRoutes);
+
+
+// 404 HANDLER
+
 
 app.use((req, res) => {
   ResponseHandler.notFound(res, `Route ${req.method} ${req.path} non trouvée`);
 });
 
-// ============================================
+
 // GESTIONNAIRE D'ERREURS GLOBAL
-// ============================================
+
 
 app.use((err, req, res, next) => {
   logger.error(`Error: ${err.message}`);
@@ -152,9 +186,9 @@ app.use((err, req, res, next) => {
   ResponseHandler.serverError(res, err);
 });
 
-// ============================================
+
 // DÉMARRAGE DU SERVEUR
-// ============================================
+
 
 const PORT = process.env.PORT || 5000;
 
@@ -171,23 +205,27 @@ const startServer = async () => {
 
     // 2. Synchroniser les modèles (uniquement en développement)
     if (process.env.NODE_ENV === 'development') {
-      logger.info('🔄 Synchronisation des modèles...');
-      await syncModels({ alter: true }); // alter: true pour mettre à jour la structure
-      logger.info('📊 Base de données synchronisée avec succès');
+      logger.info(' Synchronisation des modèles...');
+      await syncModels({ alter: false }); // alter: false pour éviter les erreurs de syncUNIQUE
+      logger.info(' Base de données synchronisée avec succès');
+
+      // Initialize cron jobs (Sprint 5)
+      logger.info(' Initialisation des tâches planifiées...');
+      cronService.initializeCronJobs();
     }
 
     // 3. Démarrer le serveur Express
     app.listen(PORT, () => {
       logger.info('='.repeat(50));
-      logger.info(`🚀 Serveur F-PRO CONSULTING démarré avec succès`);
-      logger.info(`📍 URL: http://localhost:${PORT}`);
-      logger.info(`🌍 Environnement: ${process.env.NODE_ENV || 'development'}`);
-      logger.info(`📊 Base de données: ${process.env.DB_NAME}`);
+      logger.info(` Serveur F-PRO CONSULTING démarré avec succès`);
+      logger.info(` URL: http://localhost:${PORT}`);
+      logger.info(` Environnement: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(` Base de données: ${process.env.DB_NAME}`);
       logger.info('='.repeat(50));
     });
 
   } catch (error) {
-    logger.error('❌ Erreur critique lors du démarrage du serveur:');
+    logger.error(' Erreur critique lors du démarrage du serveur:');
     logger.error(error);
     process.exit(1);
   }

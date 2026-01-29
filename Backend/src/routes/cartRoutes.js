@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const cartController = require('../controllers/cartController');
 const { validate } = require('../validators/authValidators');
+const { authenticate } = require('../middleware/authMiddleware');
 const { addItemSchema, updateItemSchema } = require('../validators/salesValidators');
 
 router.use(authenticate);

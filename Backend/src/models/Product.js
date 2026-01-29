@@ -27,7 +27,6 @@ const Product = sequelize.define('Product', {
   },
   sku: {
     type: DataTypes.STRING(50),
-    unique: true,
     allowNull: true
   },
   stock_quantity: {
@@ -49,7 +48,13 @@ const Product = sequelize.define('Product', {
   }
 }, {
   tableName: 'products',
-  underscored: true
+  underscored: true,
+  indexes: [
+    {
+      unique: true,
+      fields: ['sku']
+    }
+  ]
 });
 
 module.exports = Product;
