@@ -1,0 +1,72 @@
+.fpro-logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+}
+
+.logo-icon {
+    width: 40px;
+    height: 40px;
+    flex-shrink: 0;
+}
+
+.logo-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.logo-circle-bg {
+    fill: var(--primary-blue);
+}
+
+.logo-text-container {
+    display: flex;
+    flex-direction: column;
+    line-height: 1;
+}
+
+.logo-brand {
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--primary-blue);
+    letter-spacing: -0.5px;
+}
+
+.logo-tagline {
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--primary-blue);
+    letter-spacing: 1px;
+    margin-top: 2px;
+}
+
+/* Light version for dark backgrounds */
+.fpro-logo.light .logo-circle-bg {
+    fill: var(--white);
+}
+
+.fpro-logo.light .logo-brand,
+.fpro-logo.light .logo-tagline {
+    color: var(--white);
+}
+
+.fpro-logo.light .logo-shape-white,
+.fpro-logo.light .logo-line-white {
+    stroke: var(--primary-blue);
+}
+
+@media (max-width: 768px) {
+    .logo-icon {
+        width: 32px;
+        height: 32px;
+    }
+
+    .logo-brand {
+        font-size: 16px;
+    }
+
+    .logo-tagline {
+        font-size: 8px;
+    }
+}
