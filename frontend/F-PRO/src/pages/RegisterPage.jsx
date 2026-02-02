@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import api from '../services/api'
+
 import Logo from '../components/Logo'
 import './RegisterPage.css'
 
@@ -74,12 +76,19 @@ function RegisterPage() {
 
         setIsLoading(true)
 
-        // Simulate API call
-        setTimeout(() => {
-            setIsLoading(false)
+        try {
+            await api.post('/auth/register', formData)
             // Navigate to login page after successful registration
             navigate('/login')
-        }, 1500)
+        } catch (error) {
+            console.error('Registration error:', error)
+            setErrors(prev => ({
+                ...prev,
+                submit: error.response?.data?.message || "Une erreur s'est produite lors de l'inscription"
+            }))
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -205,6 +214,12 @@ function RegisterPage() {
                                     "S'inscrire"
                                 )}
                             </button>
+                            {errors.submit && (
+                                <div className="form-error" style={{ textAlign: 'center', marginTop: '10px' }}>
+                                    {errors.submit}
+                                </div>
+                            )}
+
 
                             <p className="login-link">
                                 Deja un compte? <Link to="/login">Se connecter</Link>

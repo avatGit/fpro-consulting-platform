@@ -31,9 +31,24 @@ const generateRefreshToken = (userId) => {
  */
 const register = async (req, res) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
-    const { company: companyData, user: userData } = req.validatedData;
+    // Map flat frontend data to internal structure
+    const { companyName, email, phone, password } = req.validatedData;
+
+    const companyData = {
+      name: companyName,
+      email: email,
+      phone: phone
+    };
+
+    const userData = {
+      first_name: 'Admin', // Default value since frontend doesn't provide it
+      last_name: companyName, // Default to company name
+      email: email,
+      password: password,
+      phone: phone
+    };
 
     // 1. Vérifier si l'email utilisateur existe déjà
     const existingUser = await User.findOne({ where: { email: userData.email } });
@@ -295,11 +310,11 @@ const refreshToken = async (req, res) => {
 const logout = async (req, res) => {
   try {
     logger.info(`User logged out: ${req.user.email}`);
-    
+
     // Note: Avec JWT, la déconnexion est principalement gérée côté client
     // en supprimant le token. Pour une invalidation côté serveur, 
     // il faudrait implémenter une blacklist de tokens.
-    
+
     return ResponseHandler.success(res, null, 'Déconnexion réussie');
 
   } catch (error) {

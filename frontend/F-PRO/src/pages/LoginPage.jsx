@@ -1,5 +1,7 @@
 import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import api from '../services/api'
+
 import Logo from '../components/Logo'
 import './LoginPage.css'
 
@@ -54,12 +56,28 @@ function LoginPage() {
 
         setIsLoading(true)
 
-        // Simulate API call
-        setTimeout(() => {
-            setIsLoading(false)
-            // Navigate to dashboard after successful login
+        try {
+            const response = await api.post('/auth/login', formData)
+            const { token, user, refreshToken } = response.data.data // Assuming standard response structure based on backend
+
+            localStorage.setItem('token', token)
+            localStorage.setItem('refreshToken', refreshToken)
+            localStorage.setItem('user', JSON.stringify(user))
+            // Basic admin check - ideally should be robust
+            if (user.role === 'admin') {
+                localStorage.setItem('isAdmin', 'true')
+            }
+
             navigate('/dashboard')
-        }, 1500)
+        } catch (error) {
+            console.error('Login error:', error)
+            setErrors(prev => ({
+                ...prev,
+                submit: error.response?.data?.message || "Email ou mot de passe incorrect"
+            }))
+        } finally {
+            setIsLoading(false)
+        }
     }
 
     return (
@@ -147,6 +165,12 @@ function LoginPage() {
                                     "Se connecter"
                                 )}
                             </button>
+                            {errors.submit && (
+                                <div className="form-error" style={{ textAlign: 'center', marginTop: '10px' }}>
+                                    {errors.submit}
+                                </div>
+                            )}
+
 
                             <p className="register-link">
                                 Pas encore de compte? <Link to="/register">S'inscrire</Link>
