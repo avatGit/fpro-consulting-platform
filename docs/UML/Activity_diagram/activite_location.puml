@@ -1,0 +1,18 @@
+@startuml Activité_ Location de service
+title Activité : Location de service
+
+start
+:Client choisit service;
+:Sélectionner dates;
+:Vérifier disponibilité;
+
+if (Disponible ?) then (Oui)
+  :Confirmer location;
+  :Enregistrer location;
+  :Envoyer confirmation;
+else (Non)
+  :Informer indisponibilité;
+endif
+
+stop
+@enduml

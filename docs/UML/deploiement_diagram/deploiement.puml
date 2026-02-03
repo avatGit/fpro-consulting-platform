@@ -1,0 +1,30 @@
+@startuml deploiement
+title Diagramme de déploiement - Plateforme F-PRO CONSULTING
+
+node "Client Web\n(Navigateur)" {
+  component "Application Web\n(React / Angular)"
+}
+
+node "Client Mobile\n(Smartphone)" {
+  component "Application Mobile\n(Flutter)"
+}
+
+node "Serveur Applicatif" {
+  component "API Backend\n(Node.js / Spring Boot)"
+}
+
+node "Serveur Base de Données" {
+  database "PostgreSQL"
+}
+
+node "Service Externe" {
+  component "Service Notification\n(Email / SMS)"
+}
+
+"Application Web\n(React / Angular)" --> "API Backend\n(Node.js / Spring Boot)" : HTTPS
+"Application Mobile\n(Flutter)" --> "API Backend\n(Node.js / Spring Boot)" : HTTPS
+
+"API Backend\n(Node.js / Spring Boot)" --> "PostgreSQL" : JDBC / ORM
+"API Backend\n(Node.js / Spring Boot)" --> "Service Notification\n(Email / SMS)"
+
+@enduml

@@ -1,0 +1,20 @@
+@startuml Commande de produits
+title Commande de produits - F-PRO CONSULTING
+
+actor Client
+participant "Interface Web/Mobile" as UI
+participant "Système F-PRO" as SYS
+database "Base de données" as DB
+participant "Service Notification" as NOTIF
+
+Client -> UI : Sélectionner produits
+UI -> SYS : Ajouter au panier
+Client -> UI : Demander devis
+SYS -> DB : Calculer montant devis
+SYS --> UI : Afficher devis
+Client -> UI : Confirmer commande
+UI -> SYS : Créer commande
+SYS -> DB : Enregistrer commande
+SYS -> NOTIF : Envoyer confirmation
+@enduml
+

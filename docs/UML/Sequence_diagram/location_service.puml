@@ -1,0 +1,21 @@
+@startuml Location de services
+title Location de services technologiques
+
+actor Client
+participant "Système F-PRO" as SYS
+database DB
+participant "Service Notification" as NOTIF
+
+Client -> SYS : Choisir service
+Client -> SYS : Sélectionner dates
+SYS -> DB : Vérifier disponibilité
+
+alt Service disponible
+    Client -> SYS : Confirmer location
+    SYS -> DB : Enregistrer location
+    SYS -> NOTIF : Confirmation location
+else Service indisponible
+    SYS -> Client : Message indisponibilité
+end
+@enduml
+

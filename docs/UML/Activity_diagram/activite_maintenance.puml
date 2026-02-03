@@ -1,0 +1,24 @@
+@startuml Activité_ Demande de maintenance 
+title Activité : Demande de maintenance 
+
+start
+:Client soumet demande de maintenance;
+:Enregistrer demande;
+
+:Agent consulte demandes;
+:Rechercher technicien disponible;
+
+if (Technicien disponible ?) then (Oui)
+  :Affecter technicien;
+  :Notifier technicien;
+  :Technicien effectue intervention;
+  :Mettre à jour statut;
+  :Clôturer intervention;
+  :Notifier client;
+else (Non)
+  :Mettre demande en attente;
+  :Notifier client (indisponibilité);
+endif
+
+stop
+@enduml
