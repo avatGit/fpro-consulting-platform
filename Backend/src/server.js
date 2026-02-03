@@ -90,6 +90,15 @@ app.get('/api/health', async (req, res) => {
 const authRoutes = require('./routes/authRoutes');
 app.use('/api/auth', authRoutes);
 
+// Routes catalogue (Sprint 2)
+const categoryRoutes = require('./routes/categoryRoutes');
+const productRoutes = require('./routes/productRoutes');
+const serviceRoutes = require('./routes/serviceRoutes');
+
+app.use('/api/categories', categoryRoutes);
+app.use('/api/products', productRoutes);
+app.use('/api/services', serviceRoutes);
+
 // ============================================
 // GESTION DES ERREURS 404
 // ============================================
@@ -153,7 +162,7 @@ const startServer = async () => {
     // 2. Synchroniser les modèles (uniquement en développement)
     if (process.env.NODE_ENV === 'development') {
       logger.info('🔄 Synchronisation des modèles...');
-      await syncModels({ alter: true }); // alter: true pour mettre à jour la structure
+      await syncModels({ force: false }); // force: false pour ne pas supprimer les données
       logger.info('📊 Base de données synchronisée avec succès');
     }
     
