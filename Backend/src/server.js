@@ -3,20 +3,20 @@ const dotenv = require('dotenv');
 const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
-const { testConnection } = require('./config/database');
+const { testConnection, sequelize } = require('./config/database');
 const { syncModels } = require('./models');
 const ResponseHandler = require('./utils/responseHandler');
 const logger = require('./utils/logger');
+const { swaggerUi, specs } = require('./config/swagger');
+const { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
+const { sanitizeAll, blockMaliciousInput } = require('./middleware/sanitizer');
+const cronService = require('./services/cronService');
 
 // Charger les variables d'environnement
 dotenv.config();
 
 // Initialiser l'application Express
 const app = express();
-
-// ============================================
-// MIDDLEWARES DE SÉCURITÉ
-// ============================================
 
 // Helmet - Sécurise les headers HTTP
 app.use(helmet());
@@ -29,17 +29,19 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// ============================================
 // MIDDLEWARES DE PARSING
-// ============================================
-
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// ============================================
-// LOGGING
-// ============================================
+// SECURITY MIDDLEWARE (Sprint 6)
+// Rate limiting - Apply to all API routes
+app.use('/api/', apiLimiter);
 
+// Input sanitization - Prevent XSS and injection attacks
+app.use(sanitizeAll);
+app.use(blockMaliciousInput);
+
+// LOGGING
 // Morgan - Logs des requêtes HTTP
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
@@ -47,10 +49,7 @@ if (process.env.NODE_ENV === 'development') {
   app.use(morgan('combined'));
 }
 
-// ============================================
 // ROUTES DE BASE
-// ============================================
-
 // Route de santé (Health Check)
 app.get('/', (req, res) => {
   ResponseHandler.success(res, {
@@ -66,7 +65,7 @@ app.get('/api/health', async (req, res) => {
   try {
     // Vérifier la connexion à la base de données
     await sequelize.authenticate();
-    
+
     ResponseHandler.success(res, {
       status: 'healthy',
       database: 'connected',
@@ -82,13 +81,46 @@ app.get('/api/health', async (req, res) => {
   }
 });
 
-// ============================================
 // ROUTES API
-// ============================================
 
-// Routes d'authentification
+// Routes d'authentification (with strict rate limiting)
 const authRoutes = require('./routes/authRoutes');
-app.use('/api/auth', authRoutes);
+app.use('/api/auth', authLimiter, authRoutes);
+
+// Documentation API
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(specs));
+
+// Routes Cart, Quote, Order (Sprint 3)
+const cartRoutes = require('./routes/cartRoutes');
+const quoteRoutes = require('./routes/quoteRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+
+app.use('/api/cart', cartRoutes);
+app.use('/api/quotes', quoteRoutes);
+app.use('/api/orders', orderRoutes);
+
+// Routes Maintenance, Intervention, Rental (Sprint 4)
+const maintenanceRoutes = require('./routes/maintenanceRoutes');
+const interventionRoutes = require('./routes/interventionRoutes');
+const rentalRoutes = require('./routes/rentalRoutes');
+
+app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/interventions', interventionRoutes);
+app.use('/api/rentals', rentalRoutes);
+
+// Routes Notifications (Sprint 5)
+const notificationRoutes = require('./routes/notificationRoutes');
+app.use('/api/notifications', notificationRoutes);
+
+// MANAGEMENT ROUTES (Critical Gaps Fixed)
+
+// Admin User Management
+const adminUserRoutes = require('./routes/adminUserRoutes');
+app.use('/api/admin/users', adminUserRoutes);
+
+// Company Management
+const companyRoutes = require('./routes/companyRoutes');
+app.use('/api/companies', companyRoutes);
 
 // Routes catalogue (Sprint 2)
 const categoryRoutes = require('./routes/categoryRoutes');
@@ -99,22 +131,16 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/services', serviceRoutes);
 
-// ============================================
-// GESTION DES ERREURS 404
-// ============================================
-
+// 404 HANDLER
 app.use((req, res) => {
   ResponseHandler.notFound(res, `Route ${req.method} ${req.path} non trouvée`);
 });
 
-// ============================================
 // GESTIONNAIRE D'ERREURS GLOBAL
-// ============================================
-
 app.use((err, req, res, next) => {
   logger.error(`Error: ${err.message}`);
   logger.error(err.stack);
-  
+
   // Erreur de validation Sequelize
   if (err.name === 'SequelizeValidationError') {
     const errors = err.errors.map(e => ({
@@ -123,29 +149,26 @@ app.use((err, req, res, next) => {
     }));
     return ResponseHandler.validationError(res, errors);
   }
-  
+
   // Erreur de contrainte unique Sequelize
   if (err.name === 'SequelizeUniqueConstraintError') {
     return ResponseHandler.error(res, 'Cette ressource existe déjà', 409);
   }
-  
+
   // Erreur JWT
   if (err.name === 'JsonWebTokenError') {
     return ResponseHandler.unauthorized(res, 'Token invalide');
   }
-  
+
   if (err.name === 'TokenExpiredError') {
     return ResponseHandler.unauthorized(res, 'Token expiré');
   }
-  
+
   // Erreur générique
   ResponseHandler.serverError(res, err);
 });
 
-// ============================================
 // DÉMARRAGE DU SERVEUR
-// ============================================
-
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
@@ -153,29 +176,33 @@ const startServer = async () => {
     // 1. Tester la connexion à PostgreSQL
     logger.info('🔌 Connexion à la base de données...');
     const isConnected = await testConnection();
-    
+
     if (!isConnected) {
       logger.error('❌ Impossible de démarrer le serveur sans connexion à la base de données');
       process.exit(1);
     }
-    
+
     // 2. Synchroniser les modèles (uniquement en développement)
     if (process.env.NODE_ENV === 'development') {
       logger.info('🔄 Synchronisation des modèles...');
-      await syncModels({ force: false }); // force: false pour ne pas supprimer les données
+      await syncModels({ alter: false }); // alter: false pour éviter les erreurs
       logger.info('📊 Base de données synchronisée avec succès');
+
+      // Initialize cron jobs (Sprint 5)
+      logger.info('⏰ Initialisation des tâches planifiées...');
+      cronService.initializeCronJobs();
     }
-    
+
     // 3. Démarrer le serveur Express
     app.listen(PORT, () => {
       logger.info('='.repeat(50));
-      logger.info(`🚀 Serveur F-PRO CONSULTING démarré avec succès`);
-      logger.info(`📍 URL: http://localhost:${PORT}`);
+      logger.info(`✅ Serveur F-PRO CONSULTING démarré avec succès`);
+      logger.info(`📡 URL: http://localhost:${PORT}`);
       logger.info(`🌍 Environnement: ${process.env.NODE_ENV || 'development'}`);
-      logger.info(`📊 Base de données: ${process.env.DB_NAME}`);
+      logger.info(`💾 Base de données: ${process.env.DB_NAME}`);
       logger.info('='.repeat(50));
     });
-    
+
   } catch (error) {
     logger.error('❌ Erreur critique lors du démarrage du serveur:');
     logger.error(error);

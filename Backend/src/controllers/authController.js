@@ -31,7 +31,7 @@ const generateRefreshToken = (userId) => {
  */
 const register = async (req, res) => {
   const transaction = await sequelize.transaction();
-  
+
   try {
     const { company: companyData, user: userData } = req.validatedData;
 
@@ -295,11 +295,11 @@ const refreshToken = async (req, res) => {
 const logout = async (req, res) => {
   try {
     logger.info(`User logged out: ${req.user.email}`);
-    
+
     // Note: Avec JWT, la déconnexion est principalement gérée côté client
     // en supprimant le token. Pour une invalidation côté serveur, 
     // il faudrait implémenter une blacklist de tokens.
-    
+
     return ResponseHandler.success(res, null, 'Déconnexion réussie');
 
   } catch (error) {
