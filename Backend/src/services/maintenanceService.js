@@ -13,6 +13,15 @@ class MaintenanceService {
         });
     }
 
+    async getUserRequests(userId, companyId) {
+        const { MaintenanceRequest } = require('../models');
+        const whereClause = companyId ? { company_id: companyId } : { user_id: userId };
+        return await MaintenanceRequest.findAll({
+            where: whereClause,
+            order: [['created_at', 'DESC']]
+        });
+    }
+
     async getRequestDetails(requestId) {
         const request = await maintenanceRequestRepository.findWithDetails(requestId);
         if (!request) throw new Error('Demande de maintenance non trouvée');

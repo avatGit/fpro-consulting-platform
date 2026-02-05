@@ -11,6 +11,18 @@ class MaintenanceController {
         }
     }
 
+    async listUserRequests(req, res) {
+        try {
+            console.log(`Fetching maintenance for company_id: ${req.user.company_id}`);
+            const requests = await maintenanceService.getUserRequests(req.userId, req.user.company_id);
+            console.log(`Found ${requests.length} maintenance requests for company ${req.user.company_id}`);
+            return ResponseHandler.success(res, requests, 'Liste des demandes récupérée');
+        } catch (error) {
+            console.error('Error listing maintenance requests:', error);
+            return ResponseHandler.serverError(res, error);
+        }
+    }
+
     async getRequest(req, res) {
         try {
             const { id } = req.params;

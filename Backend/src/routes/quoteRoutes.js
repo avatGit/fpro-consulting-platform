@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const quoteController = require('../controllers/quoteController');
 const { authenticate } = require('../middleware/authMiddleware');
+const { authorize } = require('../middleware/rbacMiddleware');
 
 const { validate } = require('../validators/authValidators');
 const { generateQuoteSchema, updateQuoteStatusSchema } = require('../validators/salesValidators');
@@ -27,7 +28,7 @@ router.use(authenticate);
  *       201:
  *         description: Devis créé
  */
-router.post('/generate', validate(generateQuoteSchema), quoteController.createFromCart);
+router.post('/generate', authorize('client'), validate(generateQuoteSchema), quoteController.createFromCart);
 
 /**
  * @swagger

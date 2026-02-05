@@ -48,8 +48,9 @@ const syncDatabase = async (options = {}) => {
   }
 };
 
-module.exports = { 
-  sequelize, 
-  testConnection, 
-  syncDatabase 
+module.exports = {
+  sequelize,
+  Sequelize,
+  testConnection,
+  syncDatabase
 };

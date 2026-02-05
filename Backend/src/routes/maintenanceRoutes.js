@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const maintenanceController = require('../controllers/maintenanceController');
 const { authenticate } = require('../middleware/authMiddleware');
+const { authorize } = require('../middleware/rbacMiddleware');
 const { validate } = require('../validators/authValidators');
 const { createMaintenanceSchema, assignTechnicianSchema } = require('../validators/maintenanceValidators');
 
@@ -28,7 +29,8 @@ router.use(authenticate);
  *       201:
  *         description: Demande créée
  */
-router.post('/', validate(createMaintenanceSchema), maintenanceController.createRequest);
+router.post('/', authorize('client'), validate(createMaintenanceSchema), maintenanceController.createRequest);
+router.get('/', maintenanceController.listUserRequests);
 
 /**
  * @swagger

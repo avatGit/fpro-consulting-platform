@@ -1,4 +1,4 @@
-const { sequelize } = require('../config/database');
+const { sequelize, Sequelize } = require('../config/database');
 const Company = require('./Company');
 const User = require('./User');
 const Product = require('./Product');
@@ -129,5 +129,6 @@ module.exports = {
   InterventionReport,
   Rental,
   RentalItem,
-  syncModels
+  syncModels,
+  Sequelize
 };

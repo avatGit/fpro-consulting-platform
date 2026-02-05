@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import api from '../services/api'
 import { Link } from 'react-router-dom'
 import Logo from '../components/Logo'
 import './DashboardPage.css'
@@ -6,48 +7,16 @@ import './DashboardPage.css'
 function DashboardPage() {
     const [activeMenu, setActiveMenu] = useState('dashboard')
     const [previousMenu, setPreviousMenu] = useState('dashboard')
-    const [cart, setCart] = useState([])
-    const [orders, setOrders] = useState([
-        {
-            id: 1,
-            ref: 'CMD-1032',
-            status: 'En cours',
-            date: '12/11/2019',
-            items: 'Materiel : 5x PC Dell',
-            agent: 'Karim Diallo',
-            timeline: [
-                { label: 'Demande recue', status: 'completed' },
-                { label: 'En cours', status: 'current' },
-                { label: 'Intervention Prevue', status: 'pending' }
-            ]
-        },
-        {
-            id: 2,
-            ref: 'CMD-832',
-            status: 'En attente',
-            date: '12/11/2024',
-            items: 'Materiel : 1x Imprimante Pro',
-            agent: 'Karim Diallo',
-            timeline: [
-                { label: 'Demande recue', status: 'completed' },
-                { label: 'En cours', status: 'pending' },
-                { label: 'Intervention Prevue', status: 'pending' }
-            ]
-        },
-        {
-            id: 3,
-            ref: 'CMD-1232',
-            status: 'Termine',
-            date: '02/01/2026',
-            items: 'Service : Maintenance Serveur',
-            agent: 'Karim Diallo',
-            timeline: [
-                { label: 'Demande recue', status: 'completed' },
-                { label: 'En cours', status: 'completed' },
-                { label: 'Intervention Prevue', status: 'completed' }
-            ]
-        }
+    const [loading, setLoading] = useState(true)
+    const [stats, setStats] = useState([
+        { id: 1, title: 'Commande en cours', count: 0, color: 'orange' },
+        { id: 2, title: 'Devis en Attente', count: 0, color: 'blue' },
+        { id: 3, title: 'Intervention en Cours', count: 0, color: 'green' },
+        { id: 4, title: 'Factures a Payer', count: 0, color: 'orange' }
     ])
+    const [recentActivities, setRecentActivities] = useState([])
+    const [cart, setCart] = useState([])
+    const [orders, setOrders] = useState([])
     const [selectedOrder, setSelectedOrder] = useState(null)
     const [feedbacks, setFeedbacks] = useState([
         {
@@ -73,6 +42,8 @@ function DashboardPage() {
         message: '',
         orderRef: ''
     })
+    const [quotes, setQuotes] = useState([])
+    const [products, setProducts] = useState([])
     const [showDevisModal, setShowDevisModal] = useState(false)
     const [devisForm, setDevisForm] = useState({
         client: '',
@@ -80,38 +51,390 @@ function DashboardPage() {
         products: [{ name: '', quantity: 1, unitPrice: 0 }]
     })
     const [currentDevis, setCurrentDevis] = useState(null)
+    const [user, setUser] = useState({
+        name: 'Utilisateur',
+        email: 'email@exemple.com',
+        role: 'client'
+    })
 
-    const handleAddToCart = (item) => {
-        setCart([...cart, { ...item, cartId: Date.now() }])
-        alert(`${item.name} ajoute au panier !`)
-    }
-
-    const handleRemoveFromCart = (cartId) => {
-        setCart(cart.filter(item => item.cartId !== cartId))
-    }
-
-    const handleConfirmOrder = () => {
-        if (cart.length === 0) return
-
-        const newOrder = {
-            id: Date.now(),
-            ref: `CMD-${Math.floor(1000 + Math.random() * 9000)}`,
-            status: 'En attente',
-            date: new Date().toLocaleDateString('fr-FR'),
-            items: `Commande de ${cart.length} produit(s)`,
-            agent: 'Karim Diallo',
-            timeline: [
-                { label: 'Demande recue', status: 'completed' },
-                { label: 'En cours', status: 'pending' },
-                { label: 'Intervention Prevue', status: 'pending' }
-            ]
+    // 1. Initial Load: User Info
+    useEffect(() => {
+        const storedUser = localStorage.getItem('user');
+        if (storedUser) {
+            try {
+                const parsed = JSON.parse(storedUser);
+                const userName = parsed.name ||
+                    (parsed.first_name && parsed.last_name ? `${parsed.first_name} ${parsed.last_name}` :
+                        parsed.first_name || parsed.last_name || 'Utilisateur');
+                setUser({
+                    ...parsed,
+                    name: userName,
+                    role: parsed.role || 'client',
+                    company_id: parsed.company_id || parsed.company?.id
+                });
+            } catch (e) {
+                console.error("Error parsing user from local storage", e);
+            }
+        } else {
+            const token = localStorage.getItem('token');
+            if (token) {
+                try {
+                    const base64Url = token.split('.')[1];
+                    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+                    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+                        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                    }).join(''));
+                    const decoded = JSON.parse(jsonPayload);
+                    setUser({
+                        name: decoded.name || 'Utilisateur',
+                        email: decoded.email,
+                        role: decoded.role || 'client',
+                        company_id: decoded.company_id // Might be in token
+                    });
+                } catch (e) {
+                    console.error("Error decoding token", e);
+                }
+            }
         }
+    }, [])
 
-        setOrders([newOrder, ...orders])
-        setCart([])
-        setActiveMenu('suivi')
-        setSelectedOrder(newOrder)
-        alert('Commande confirmee !')
+    // Fetch Cart helper
+    const fetchCart = async () => {
+        try {
+            const response = await api.get('/cart');
+            const backendCart = response.data.data;
+            const mappedItems = backendCart.items.map(item => ({
+                ...item.product,
+                cartId: item.id, // backend itemId
+                quantity: item.quantity,
+                price: `${item.unit_price} FCFA`
+            }));
+            setCart(mappedItems);
+        } catch (error) {
+            console.error("Error fetching cart:", error);
+        }
+    };
+
+    const mapBackendQuoteToDevisState = (quote) => {
+        if (!quote) return null;
+        return {
+            id: quote.id,
+            ref: quote.quote_number,
+            quote_number: quote.quote_number,
+            date: new Date(quote.created_at).toLocaleDateString('fr-FR'),
+            client: quote.company ? quote.company.name : (user.company ? user.company.name : 'Client'),
+            address: quote.company ? quote.company.address : (user.company ? user.company.address : 'Adresse non renseignée'),
+            total_amount: quote.total_amount,
+            totalHT: quote.subtotal,
+            tva: quote.vat_amount,
+            totalTTC: quote.total_amount,
+            status: quote.status,
+            products: quote.items ? quote.items.map(item => ({
+                name: item.product ? item.product.name : 'Produit',
+                quantity: item.quantity,
+                unitPrice: item.unit_price,
+                total: item.subtotal
+            })) : []
+        };
+    };
+
+    // 2. Navigation Logic: Fetch Data based on activeMenu
+    useEffect(() => {
+        if (activeMenu === 'dashboard') {
+            const fetchDashboardData = async () => {
+                try {
+                    const response = await api.get('/dashboard/summary')
+                    const { counts, recentActivities: activities } = response.data.data
+
+                    setStats([
+                        { id: 1, title: 'Commande en cours', count: counts.ordersInProgress, color: 'orange' },
+                        { id: 2, title: 'Devis en Attente', count: counts.quotesPending, color: 'blue' },
+                        { id: 3, title: 'Intervention en Cours', count: counts.interventionsActive, color: 'green' },
+                        { id: 4, title: 'Factures a Payer', count: counts.invoicesUnpaid, color: 'orange' }
+                    ])
+
+                    const mappedActivities = activities.map((item, index) => {
+                        let typeLabel = item.type
+                        let statusLabel = item.status
+                        let statusColor = 'blue'
+
+                        if (item.type === 'order') typeLabel = 'Commande'
+                        else if (item.type === 'quote') typeLabel = 'Devis'
+                        else if (item.type === 'maintenance') typeLabel = 'Intervention'
+
+                        if (['pending', 'new', 'draft', 'sent'].includes(item.status)) {
+                            statusLabel = 'En attente'
+                            statusColor = 'orange'
+                        } else if (['validated', 'processing', 'in_progress', 'assigned'].includes(item.status)) {
+                            statusLabel = 'En Cours'
+                            statusColor = 'blue'
+                        } else if (['shipped', 'delivered', 'done', 'accepted', 'completed'].includes(item.status)) {
+                            statusLabel = 'Terminé'
+                            statusColor = 'green'
+                        } else if (['cancelled', 'refused'].includes(item.status)) {
+                            statusLabel = 'Annulé'
+                            statusColor = 'red'
+                        }
+
+                        const dateObj = new Date(item.date)
+                        const dateStr = dateObj.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })
+                        const timeStr = dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+
+                        return {
+                            id: item.id || index,
+                            type: typeLabel,
+                            number: item.number ? `#${item.number}` : '',
+                            status: statusLabel,
+                            statusColor: statusColor,
+                            dateDisplay: `${dateStr} ${timeStr}`
+                        }
+                    })
+
+                    setRecentActivities(mappedActivities)
+                } catch (error) {
+                    console.error("Error fetching dashboard data:", error)
+                } finally {
+                    setLoading(false)
+                }
+            }
+            fetchDashboardData()
+            fetchCart()
+        } else if (activeMenu === 'commandes') {
+            fetchCart()
+        } else if (activeMenu === 'suivi') {
+            const fetchOrders = async () => {
+                setLoading(true)
+                try {
+                    const token = localStorage.getItem('token');
+                    if (!token) return;
+
+                    console.log("Fetching Suivi data...");
+                    const [ordersRes, maintenanceRes] = await Promise.allSettled([
+                        api.get('/orders'),
+                        api.get('/maintenance')
+                    ]);
+
+                    let fetchedOrders = [];
+                    if (ordersRes.status === 'fulfilled') {
+                        console.log("Orders received:", ordersRes.value.data);
+                        const rawOrders = ordersRes.value.data.data || [];
+                        fetchedOrders = rawOrders.map(order => {
+                            // Generate Timeline based on status
+                            let timeline = [
+                                { label: 'Validation', status: 'pending' },
+                                { label: 'Préparation', status: 'pending' },
+                                { label: 'Expédition', status: 'pending' },
+                                { label: 'Livraison', status: 'pending' }
+                            ]
+
+                            const s = order.status
+                            if (['validated', 'processing', 'shipped', 'delivered', 'done'].includes(s)) {
+                                timeline[0].status = 'completed'
+                                timeline[1].status = 'current'
+                            }
+                            if (['processing', 'shipped', 'delivered', 'done'].includes(s)) {
+                                timeline[1].status = 'completed'
+                                timeline[2].status = 'current'
+                            }
+                            if (['shipped', 'delivered', 'done'].includes(s)) {
+                                timeline[2].status = 'completed'
+                                timeline[3].status = 'current'
+                            }
+                            if (['delivered', 'done'].includes(s)) {
+                                timeline[3].status = 'completed'
+                            }
+                            if (s === 'pending') {
+                                timeline[0].status = 'current'
+                            }
+
+                            // Map Status Label for CSS classes
+                            let statusValue = 'en-attente'
+                            let statusText = 'En attente'
+
+                            if (['validated', 'processing'].includes(s)) {
+                                statusValue = 'en-cours'
+                                statusText = 'En cours'
+                            } else if (['shipped'].includes(s)) {
+                                statusValue = 'en-cours'
+                                statusText = 'Expédié'
+                            } else if (['delivered', 'done'].includes(s)) {
+                                statusValue = 'termine'
+                                statusText = 'Terminé'
+                            } else if (s === 'cancelled') {
+                                statusValue = 'annule'
+                                statusText = 'Annulé'
+                            }
+
+                            // Generate Items String - Defensive check for createdAt vs created_at
+                            const rawDate = order.createdAt || order.created_at || new Date();
+
+                            let itemsSummary = 'Détails non disponibles'
+                            if (order.items && order.items.length > 0) {
+                                itemsSummary = order.items.map(i => {
+                                    const pName = i.product ? i.product.name : 'Produit inconnu'
+                                    return `${i.quantity}x ${pName}`
+                                }).join(', ')
+                            }
+
+                            return {
+                                id: order.id,
+                                type: 'Commande',
+                                ref: order.order_number,
+                                status: statusText,
+                                statusClass: statusValue,
+                                date: new Date(rawDate).toLocaleDateString('fr-FR'),
+                                sortDate: new Date(rawDate),
+                                items: itemsSummary,
+                                agent: 'Admin',
+                                timeline: timeline,
+                                totalAmount: order.total_amount
+                            }
+                        });
+                    } else {
+                        console.error("Failed to fetch orders:", ordersRes.reason);
+                    }
+
+                    let fetchedMaintenance = [];
+                    if (maintenanceRes.status === 'fulfilled') {
+                        console.log("Maintenance received:", maintenanceRes.value.data);
+                        const rawMaint = maintenanceRes.value.data.data || [];
+                        fetchedMaintenance = rawMaint.map(req => {
+                            let statusText = req.status;
+                            let statusValue = 'en-attente';
+
+                            if (statusText === 'new') {
+                                statusText = 'Nouveau';
+                                statusValue = 'en-attente';
+                            } else if (statusText === 'assigned' || statusText === 'in_progress') {
+                                statusText = 'En cours';
+                                statusValue = 'en-cours';
+                            } else if (statusText === 'resolved' || statusText === 'done' || statusText === 'closed') {
+                                statusText = 'Terminé';
+                                statusValue = 'termine';
+                            }
+
+                            const rawDate = req.createdAt || req.created_at || new Date();
+
+                            return {
+                                id: req.id,
+                                type: 'Maintenance',
+                                ref: `MNT-${req.id.substring(0, 8).toUpperCase()}`,
+                                status: statusText,
+                                statusClass: statusValue,
+                                date: new Date(rawDate).toLocaleDateString('fr-FR'),
+                                sortDate: new Date(rawDate),
+                                items: req.description,
+                                agent: 'Agent Technique',
+                                timeline: [
+                                    { label: 'Demande reçue', status: statusValue === 'en-attente' ? 'current' : 'completed' },
+                                    { label: 'Intervention', status: statusValue === 'en-cours' ? 'current' : (statusValue === 'termine' ? 'completed' : 'pending') },
+                                    { label: 'Résolution', status: statusValue === 'termine' ? 'completed' : 'pending' }
+                                ]
+                            }
+                        });
+                    } else {
+                        console.error("Failed to fetch maintenance:", maintenanceRes.reason);
+                    }
+
+                    // Merge and sort by raw date objects
+                    const allItems = [...fetchedOrders, ...fetchedMaintenance].sort((a, b) => b.sortDate - a.sortDate);
+                    console.log("Final orders list for UI:", allItems);
+                    setOrders(allItems);
+
+                } catch (err) {
+                    console.error("Global error in Suivi fetch:", err)
+                } finally {
+                    setLoading(false)
+                }
+            }
+            fetchOrders()
+        } else if (activeMenu === 'devis') {
+            const fetchQuotes = async () => {
+                setLoading(true)
+                try {
+                    const response = await api.get('/quotes')
+                    setQuotes(response.data.data)
+                } catch (err) {
+                    console.error("Error fetching quotes:", err)
+                } finally {
+                    setLoading(false)
+                }
+            }
+            fetchQuotes()
+        } else if (activeMenu === 'products') {
+            const fetchProducts = async () => {
+                setLoading(true)
+                try {
+                    const response = await api.get('/products')
+                    setProducts(response.data.data)
+                } catch (err) {
+                    console.error("Error fetching products:", err)
+                } finally {
+                    setLoading(false)
+                }
+            }
+            fetchProducts()
+        }
+    }, [activeMenu])
+
+    const handleAddToCart = async (item) => {
+        try {
+            await api.post('/cart/items', { productId: item.id, quantity: 1 });
+            // Refresh cart from server
+            await fetchCart();
+            alert(`${item.name} ajouté au panier !`);
+        } catch (error) {
+            console.error(error);
+            alert("Erreur lors de l'ajout au panier");
+        }
+    }
+
+    const handleRemoveFromCart = async (itemId) => {
+        try {
+            await api.delete(`/cart/items/${itemId}`);
+            await fetchCart();
+        } catch (error) {
+            console.error(error);
+            alert("Erreur lors de la suppression de l'article");
+        }
+    }
+
+    const handleGenerateQuoteFromCart = async () => {
+        if (cart.length === 0) return;
+
+        try {
+            const response = await api.post('/quotes/generate', { companyId: user.company_id });
+            const quote = response.data.data;
+            alert('✓ Devis généré avec succès ! Vous pouvez maintenant le télécharger.');
+
+            // Map backend quote to UI state
+            const mappedDevis = mapBackendQuoteToDevisState(quote);
+            setCurrentDevis(mappedDevis);
+
+            // Refresh list of quotes
+            const quotesRes = await api.get('/quotes');
+            setQuotes(quotesRes.data.data);
+
+            setCart([]);
+            setActiveMenu('devis');
+        } catch (error) {
+            console.error(error);
+            alert("Erreur lors de la génération du devis. Assurez-vous d'avoir des articles dans le panier.");
+        }
+    }
+
+    const handleSelectQuote = async (quoteId) => {
+        try {
+            setLoading(true);
+            const response = await api.get(`/quotes/${quoteId}`);
+            const quote = response.data.data;
+            setCurrentDevis(mapBackendQuoteToDevisState(quote));
+        } catch (error) {
+            console.error("Error fetching quote details:", error);
+            alert("Impossible de charger les détails du devis.");
+        } finally {
+            setLoading(false);
+        }
     }
 
     const handleFeedbackSubmit = (e) => {
@@ -133,71 +456,22 @@ function DashboardPage() {
         alert('Merci pour votre retour !')
     }
 
-    // Devis handlers
-    const handleAddProduct = () => {
-        setDevisForm({
-            ...devisForm,
-            products: [...devisForm.products, { name: '', quantity: 1, unitPrice: 0 }]
-        })
-    }
-
-    const handleRemoveProduct = (index) => {
-        const newProducts = devisForm.products.filter((_, i) => i !== index)
-        setDevisForm({ ...devisForm, products: newProducts })
-    }
-
-    const handleProductChange = (index, field, value) => {
-        const newProducts = [...devisForm.products]
-        newProducts[index][field] = value
-        setDevisForm({ ...devisForm, products: newProducts })
-    }
-
-    const calculateTotals = () => {
-        const totalHT = devisForm.products.reduce((sum, product) => {
-            return sum + (product.quantity * product.unitPrice)
-        }, 0)
-        const tva = totalHT * 0.20
-        const totalTTC = totalHT + tva
-        return { totalHT, tva, totalTTC }
-    }
-
-    const handleGenerateDevis = () => {
-        setShowDevisModal(true)
-    }
-
-    const handleSubmitDevis = (e) => {
-        e.preventDefault()
-        if (!devisForm.client || !devisForm.address || devisForm.products.some(p => !p.name || p.quantity <= 0 || p.unitPrice <= 0)) {
-            alert('Veuillez remplir tous les champs du devis correctement.')
-            return
+    const handleDownloadPdf = async (quoteId) => {
+        try {
+            const response = await api.get(`/quotes/${quoteId}/pdf`, {
+                responseType: 'blob'
+            });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `quote-${quoteId}.pdf`); // or extract from header
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (error) {
+            console.error('Error downloading PDF:', error);
+            alert('Impossible de télécharger le PDF.');
         }
-
-        // Calculate totals
-        const totals = calculateTotals()
-
-        // Create new devis
-        const newDevis = {
-            id: Date.now(),
-            ref: `DEV-${Math.floor(1000 + Math.random() * 9000)}`,
-            date: new Date().toLocaleDateString('fr-FR'),
-            client: devisForm.client,
-            address: devisForm.address,
-            products: [...devisForm.products],
-            totalHT: totals.totalHT,
-            tva: totals.tva,
-            totalTTC: totals.totalTTC
-        }
-
-        setCurrentDevis(newDevis)
-        alert('✓ Devis généré avec succès !')
-        setShowDevisModal(false)
-
-        // Reset form
-        setDevisForm({
-            client: '',
-            address: '',
-            products: [{ name: '', quantity: 1, unitPrice: 0 }]
-        })
     }
 
     const handlePasserCommande = () => {
@@ -212,7 +486,7 @@ function DashboardPage() {
             ref: `CMD-${Math.floor(1000 + Math.random() * 9000)}`,
             status: 'En attente',
             date: new Date().toLocaleDateString('fr-FR'),
-            items: `Devis ${currentDevis.ref} - ${currentDevis.products.length} produit(s)`,
+            items: `Devis ${currentDevis.quote_number} - ${currentDevis.total_amount} FCFA`,
             agent: 'Karim Diallo',
             timeline: [
                 { label: 'Demande recue', status: 'completed' },
@@ -231,87 +505,61 @@ function DashboardPage() {
         alert('✓ Votre commande a été validée avec succès ! Consultez la section Suivi.')
     }
 
-    const handleRent = (service) => {
-        const newOrder = {
-            id: Date.now(),
-            ref: `LOK-${Math.floor(1000 + Math.random() * 9000)}`,
-            status: 'En attente',
-            date: new Date().toLocaleDateString('fr-FR'),
-            items: `Location : ${service.name} (${service.duration})`,
-            agent: 'Karim Diallo',
-            type: 'location',
-            timeline: [
-                { label: 'Demande recue', status: 'completed' },
-                { label: 'En cours', status: 'pending' },
-                { label: 'Intervention Prevue', status: 'pending' }
-            ]
+    const [maintenanceForm, setMaintenanceForm] = useState({
+        description: '',
+        priority: '',
+        request_type: ''
+    })
+
+    const handleMaintenanceSubmit = async () => {
+        if (!maintenanceForm.description || !maintenanceForm.priority || !maintenanceForm.request_type) {
+            alert('Veuillez remplir tous les champs')
+            return
         }
 
-        setOrders([newOrder, ...orders])
-        setActiveMenu('suivi')
-        setSelectedOrder(newOrder)
-        alert(`✓ La location de "${service.name}" a été initiée !`)
+        try {
+            await api.post('/maintenance', maintenanceForm)
+            alert('Demande de maintenance envoyée avec succès !')
+            setMaintenanceForm({ description: '', priority: '', request_type: '' })
+            setActiveMenu('suivi') // Optional: redirect to tracking
+        } catch (error) {
+            console.error(error)
+            alert("Erreur lors de l'envoi de la demande")
+        }
     }
 
-    const userData = {
-        name: 'John Doe',
-        email: 'john.doe@entreprise.com',
-        company: 'F-PRO Solutions',
-        role: 'Directeur Technique',
-        phone: '+226 01 02 03 04',
-        joinDate: 'Janvier 2024'
+
+    const handleRent = async (service) => {
+        try {
+            const startDate = new Date().toISOString().split('T')[0]
+            // Default rental encoded to 2 weeks
+            const endDate = new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+
+            await api.post('/rentals', {
+                items: [{
+                    productId: service.id,
+                    startDate,
+                    endDate,
+                    quantity: 1
+                }]
+            })
+            alert(`✓ La location de "${service.name}" a été initiée !`)
+        } catch (error) {
+            console.error(error)
+            alert("Erreur lors de la location")
+        }
     }
 
-    const stats = [
-        {
-            id: 1,
-            title: 'Commande en cours',
-            count: 3,
-            color: 'orange'
-        },
-        {
-            id: 2,
-            title: 'Devis en Attente',
-            count: 2,
-            color: 'blue'
-        },
-        {
-            id: 3,
-            title: 'Intervention en Cours',
-            count: 1,
-            color: 'green'
-        },
-        {
-            id: 4,
-            title: 'Factures a Payer',
-            count: 2,
-            color: 'orange'
-        }
-    ]
-
-    const recentActivities = [
-        {
-            id: 1,
-            type: 'Commande',
-            number: '#1245',
-            status: 'En Cours',
-            statusColor: 'blue'
-        },
-        {
-            id: 2,
-            type: 'Devis',
-            number: '#845',
-            status: 'En attente',
-            statusColor: 'orange'
-        },
-        {
-            id: 3,
-            type: 'Intervention programmee',
-            number: '',
-            status: 'Aujourdhuit 10:00',
-            statusColor: 'green'
-        }
-    ]
+    // stats and recentActivities are now state variables
+    /*
+        const stats = [
+            // ... (removed hardcoded)
+        ]
+     
+        const recentActivities = [
+            // ... (removed hardcoded)
+        ]
+    */
 
     const menuItems = [
         { id: 'dashboard', label: 'Tableau de bord', icon: '📊' },
@@ -324,62 +572,15 @@ function DashboardPage() {
         { id: 'retours', label: 'Retours client', icon: '↩️' }
     ]
 
+    /*
     const products = [
         {
             id: 1,
             ref: 'REF-LAP-001',
-            name: 'Ordinateur Portable',
-            description: 'Qualite superieur chez nous',
-            price: '850.000 FCFA',
-            rating: 5,
-            image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?auto=format&fit=crop&w=300&q=80'
-        },
-        {
-            id: 2,
-            ref: 'REF-PRN-002',
-            name: 'Imprimante',
-            description: 'Qualite superieur chez nous',
-            price: '120.000 FCFA',
-            rating: 4,
-            image: 'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?auto=format&fit=crop&w=300&q=80'
-        },
-        {
-            id: 3,
-            ref: 'REF-SRV-003',
-            name: 'Serveur Rack',
-            description: 'Qualite superieur chez nous',
-            price: '1.500.000 FCFA',
-            rating: 5,
-            image: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc51?auto=format&fit=crop&w=300&q=80'
-        },
-        {
-            id: 4,
-            ref: 'REF-CAM-004',
-            name: 'Camera de surveillance',
-            description: 'Qualite superieur chez nous',
-            price: '45.000 FCFA',
-            rating: 4,
-            image: 'https://images.unsplash.com/photo-1557597774-9d2739f85a76?auto=format&fit=crop&w=300&q=80'
-        },
-        {
-            id: 5,
-            ref: 'REF-SCN-005',
-            name: 'Scanner Pro',
-            description: 'Qualite superieur chez nous',
-            price: '75.000 FCFA',
-            rating: 5,
-            image: 'https://images.unsplash.com/photo-1544006659-f0b21f04cb1d?auto=format&fit=crop&w=300&q=80'
-        },
-        {
-            id: 6,
-            ref: 'REF-MON-006',
-            name: 'Ecran 4K',
-            description: 'Qualite superieur chez nous',
-            price: '250.000 FCFA',
-            rating: 5,
-            image: 'https://images.unsplash.com/photo-1527443224154-c4a3942d3acf?auto=format&fit=crop&w=300&q=80'
+... (truncated)
         }
     ]
+    */
 
     const rentalServices = [
         {
@@ -451,7 +652,7 @@ function DashboardPage() {
                         {!['maintenance', 'retours', 'profile'].includes(activeMenu) && (
                             <div className="search-box">
                                 <span className="search-icon">🔍</span>
-                                <span className="search-text">ahsnkendimde</span>
+                                <span className="search-text">{user.role === 'client' ? 'Rechercher un produit...' : 'Recherche...'}</span>
                             </div>
                         )}
 
@@ -469,7 +670,7 @@ function DashboardPage() {
                             style={{ cursor: 'pointer' }}
                             title="Voir mon profil"
                         >
-                            <img src="https://ui-avatars.com/api/?name=User&background=1e3a8a&color=fff" alt="User" />
+                            <img src={`https://ui-avatars.com/api/?name=${(user && user.name ? user.name : 'Utilisateur').replace(' ', '+')}&background=1e3a8a&color=fff`} alt={user?.name || 'User'} />
                         </div>
                     </div>
                 </header>
@@ -509,6 +710,7 @@ function DashboardPage() {
                                             <span className={`activity-status status-${activity.statusColor}`}>
                                                 {activity.status}
                                             </span>
+                                            {activity.dateDisplay && <span style={{ fontSize: '0.8em', color: '#666', marginLeft: '10px' }}>{activity.dateDisplay}</span>}
                                         </div>
                                         <button className="details-btn">
                                             Details <span className="arrow">›</span>
@@ -523,28 +725,35 @@ function DashboardPage() {
                 {activeMenu === 'products' && (
                     <section className="products-section fade-in">
                         <div className="products-grid">
-                            {products.map((product) => (
-                                <div key={product.id} className="product-card">
-                                    <div className="product-card-body">
-                                        <div className="product-info">
-                                            <h3 className="product-name">{product.name}</h3>
-                                            <p className="product-desc">{product.description}</p>
-                                            <div className="product-rating">
-                                                {[...Array(5)].map((_, i) => (
-                                                    <span key={i} className={`star ${i < product.rating ? 'filled' : ''}`}>⭐</span>
-                                                ))}
+                            {products && products.length > 0 ? (
+                                products.map((product) => (
+                                    <div key={product.id} className="product-card">
+                                        <div className="product-card-body">
+                                            <div className="product-info">
+                                                <h3 className="product-name">{product.name}</h3>
+                                                <p className="product-desc">{product.description}</p>
+                                                <div className="product-rating">
+                                                    {[...Array(5)].map((_, i) => (
+                                                        <span key={i} className={`star ${i < (product.rating || 0) ? 'filled' : ''}`}>⭐</span>
+                                                    ))}
+                                                </div>
+                                                <div className="product-price-container">
+                                                    <span className="product-price">{product.base_price ? `${Number(product.base_price).toLocaleString('fr-FR')} FCFA` : product.price}</span>
+                                                </div>
                                             </div>
-                                            <div className="product-price-container">
-                                                <span className="product-price">{product.price}</span>
+                                            <div className="product-image">
+                                                <img src={product.image} alt={product.name} />
                                             </div>
                                         </div>
-                                        <div className="product-image">
-                                            <img src={product.image} alt={product.name} />
-                                        </div>
+                                        <button className="btn-add-cart" onClick={() => handleAddToCart(product)}>Ajouter au panier</button>
                                     </div>
-                                    <button className="btn-add-cart" onClick={() => handleAddToCart(product)}>Ajouter au panier</button>
+                                ))
+                            ) : (
+                                <div className="no-products-message" style={{ textAlign: 'center', gridColumn: '1 / -1', padding: '40px', background: '#f8f9fa', borderRadius: '12px' }}>
+                                    <h3>Aucun produit disponible pour le moment</h3>
+                                    <p>Veuillez repasser plus tard ou contacter le support.</p>
                                 </div>
-                            ))}
+                            )}
                         </div>
                     </section>
                 )}
@@ -555,12 +764,16 @@ function DashboardPage() {
                             <div className="maintenance-form">
                                 <div className="form-group">
                                     <label>Votre Email</label>
-                                    <input type="email" placeholder="exemple@email.com" className="form-input" />
+                                    <input type="email" placeholder={user.email} className="form-input" disabled />
                                 </div>
 
                                 <div className="form-group">
                                     <label>Type de Probleme</label>
-                                    <select className="form-select">
+                                    <select
+                                        className="form-select"
+                                        value={maintenanceForm.request_type}
+                                        onChange={(e) => setMaintenanceForm({ ...maintenanceForm, request_type: e.target.value })}
+                                    >
                                         <option value="">Selectionner un type</option>
                                         <option value="materiel">Materiel (Hardware)</option>
                                         <option value="logiciel">Logiciel (Software)</option>
@@ -571,12 +784,16 @@ function DashboardPage() {
 
                                 <div className="form-group">
                                     <label>Niveau d'urgence</label>
-                                    <select className="form-select">
+                                    <select
+                                        className="form-select"
+                                        value={maintenanceForm.priority}
+                                        onChange={(e) => setMaintenanceForm({ ...maintenanceForm, priority: e.target.value })}
+                                    >
                                         <option value="">Selectionner l'urgence</option>
-                                        <option value="faible">Faible</option>
-                                        <option value="moyen">Moyen</option>
-                                        <option value="eleve">Eleve</option>
-                                        <option value="critique">Critique</option>
+                                        <option value="low">Faible</option>
+                                        <option value="medium">Moyen</option>
+                                        <option value="high">Eleve</option>
+                                        <option value="urgent">Critique</option>
                                     </select>
                                 </div>
 
@@ -586,11 +803,13 @@ function DashboardPage() {
                                         placeholder="Veuillez decrire votre probleme ici..."
                                         className="form-textarea"
                                         rows="6"
+                                        value={maintenanceForm.description}
+                                        onChange={(e) => setMaintenanceForm({ ...maintenanceForm, description: e.target.value })}
                                     ></textarea>
                                 </div>
 
                                 <div className="form-footer">
-                                    <button className="btn-submit-maintenance">Envoyer la demande</button>
+                                    <button className="btn-submit-maintenance" onClick={handleMaintenanceSubmit}>Envoyer la demande</button>
                                 </div>
                             </div>
                         </div>
@@ -648,9 +867,9 @@ function DashboardPage() {
                                     <button
                                         className="btn-confirm-order"
                                         disabled={cart.length === 0}
-                                        onClick={handleConfirmOrder}
+                                        onClick={handleGenerateQuoteFromCart}
                                     >
-                                        Confirmer la commande
+                                        Générer le devis
                                     </button>
                                 </div>
                             </div>
@@ -675,7 +894,7 @@ function DashboardPage() {
                                             onClick={() => setSelectedOrder(order)}
                                         >
                                             <span className="tracking-ref">{order.ref}</span>
-                                            <span className={`tracking-status-badge status-${order.status.toLowerCase().replace(' ', '-')}`}>
+                                            <span className={`tracking-status-badge status-${order.statusClass}`}>
                                                 {order.status}
                                             </span>
                                             <span className="tracking-date">{order.date}</span>
@@ -689,29 +908,26 @@ function DashboardPage() {
                                 {selectedOrder ? (
                                     <>
                                         <div className="details-header">
-                                            <h3>Details de la commande</h3>
+                                            <h3>Détails du Suivi</h3>
                                         </div>
                                         <div className="details-content">
                                             <div className="detail-row info-main">
-                                                <span className="detail-value highlight">Commande #{selectedOrder.ref}</span>
+                                                <span className="detail-value highlight">{selectedOrder.type} #{selectedOrder.ref}</span>
                                             </div>
                                             <div className="detail-row">
+                                                <span className="detail-label">Articles / Description :</span>
                                                 <span className="detail-value">{selectedOrder.items}</span>
                                             </div>
                                             <div className="detail-row">
-                                                <span className="detail-label">Statut:</span>
-                                                <span className="detail-value">{selectedOrder.status}</span>
+                                                <span className="detail-label">Statut Actuel :</span>
+                                                <span className={`tracking-status-badge status-${selectedOrder.statusClass}`} style={{ display: 'inline-block', width: 'fit-content', flex: 'none' }}>
+                                                    {selectedOrder.status}
+                                                </span>
                                             </div>
                                             <div className="detail-row">
-                                                <span className="detail-label">Agent :</span>
+                                                <span className="detail-label">Opérateur :</span>
                                                 <span className="detail-value">{selectedOrder.agent}</span>
                                             </div>
-                                            {selectedOrder.type === 'location' && (
-                                                <div className="detail-row">
-                                                    <span className="detail-label">Type :</span>
-                                                    <span className="detail-value" style={{ color: '#10b981', fontWeight: 'bold' }}>Location</span>
-                                                </div>
-                                            )}
 
                                             <div className="tracking-timeline">
                                                 {selectedOrder.timeline.map((step, index) => (
@@ -728,7 +944,8 @@ function DashboardPage() {
                                     </>
                                 ) : (
                                     <div className="no-order-selected">
-                                        Selectionnez une commande pour voir les details
+                                        <div style={{ fontSize: '3rem', marginBottom: '15px' }}>🔍</div>
+                                        <p>Sélectionnez un élément pour voir son état d'avancement</p>
                                     </div>
                                 )}
                             </div>
@@ -737,205 +954,113 @@ function DashboardPage() {
                 )}
 
                 {activeMenu === 'devis' && (
-                    <>
-                        <section className="devis-section fade-in">
+                    <section className="devis-section fade-in">
+                        {currentDevis ? (
                             <div className="devis-card">
-                                {currentDevis ? (
-                                    <>
-                                        <div className="devis-header">
-                                            <div className="devis-title-group">
-                                                <h2 className="devis-id">Devis #{currentDevis.ref}</h2>
-                                                <div className="devis-print-date">Devis imprimé le : {currentDevis.date}</div>
-                                            </div>
-                                            <div className="devis-divider"></div>
-                                        </div>
+                                <div className="devis-header">
+                                    <div className="devis-title-group">
+                                        <h2 className="devis-id">Devis #{currentDevis.ref}</h2>
+                                        <div className="devis-print-date">Date : {currentDevis.date}</div>
+                                    </div>
+                                    <div className="devis-divider"></div>
+                                </div>
 
-                                        <div className="devis-client-info">
-                                            <p><strong>Client :</strong> {currentDevis.client}</p>
-                                            <p><strong>Addresse :</strong> {currentDevis.address}</p>
-                                        </div>
+                                <div className="devis-client-info">
+                                    <p>Client : {currentDevis.client}</p>
+                                    <p>Adresse : {currentDevis.address}</p>
+                                </div>
 
-                                        <div className="devis-table-container">
-                                            <table className="devis-table">
-                                                <thead>
+                                <div className="devis-table-container">
+                                    <table className="devis-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Produit</th>
+                                                <th>Qté</th>
+                                                <th>P.U</th>
+                                                <th>Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {currentDevis.products.map((product, index) => (
+                                                <React.Fragment key={index}>
                                                     <tr>
-                                                        <th>Produit</th>
-                                                        <th>Quantité</th>
-                                                        <th>Prix unitaire</th>
-                                                        <th>Total</th>
+                                                        <td>{product.name}</td>
+                                                        <td>{product.quantity}</td>
+                                                        <td>{product.unitPrice.toLocaleString('fr-FR')} FCFA</td>
+                                                        <td>{(product.quantity * product.unitPrice).toLocaleString('fr-FR')} FCFA</td>
                                                     </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {currentDevis.products.map((product, index) => (
-                                                        <React.Fragment key={index}>
-                                                            <tr>
-                                                                <td>{product.name}</td>
-                                                                <td>{product.quantity}</td>
-                                                                <td>{product.unitPrice.toFixed(2)}$</td>
-                                                                <td>{(product.quantity * product.unitPrice).toFixed(2)} $</td>
-                                                            </tr>
-                                                            {index < currentDevis.products.length - 1 && (
-                                                                <tr className="spacer-row"><td colSpan="4"></td></tr>
-                                                            )}
-                                                        </React.Fragment>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                        </div>
+                                                    {index < currentDevis.products.length - 1 && (
+                                                        <tr className="spacer-row"><td colSpan="4"></td></tr>
+                                                    )}
+                                                </React.Fragment>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
 
-                                        <div className="devis-totals">
-                                            <div className="total-row">
-                                                <span className="total-label">Total HT :</span>
-                                                <span className="total-value">{currentDevis.totalHT.toFixed(2)}$</span>
-                                            </div>
-                                            <div className="total-row">
-                                                <span className="total-label">Total TVA (20%)</span>
-                                                <span className="total-value">{currentDevis.tva.toFixed(2)}$</span>
-                                            </div>
-                                            <div className="total-row main-total">
-                                                <span className="total-label">Total TTC :</span>
-                                                <span className="total-value">{currentDevis.totalTTC.toFixed(2)}$</span>
-                                            </div>
-                                            <div className="final-total-display">
-                                                <span className="final-label">Total</span>
-                                                <div className="final-line"></div>
-                                                <span className="final-value">{currentDevis.totalTTC.toFixed(2)}$</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="devis-actions">
-                                            <button className="btn-devis-secondary" onClick={handleGenerateDevis}>
-                                                Generer un nouveau Devis
-                                            </button>
-                                            <button className="btn-devis-primary" onClick={handlePasserCommande}>
-                                                Passer la commande
-                                            </button>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="devis-empty-state">
-                                        <div className="empty-icon">📄</div>
-                                        <h3 className="empty-title">Aucun devis généré</h3>
-                                        <p className="empty-message">Cliquez sur le bouton ci-dessous pour créer un nouveau devis</p>
-                                        <button className="btn-devis-secondary" onClick={handleGenerateDevis}>
-                                            Generer le Devis
-                                        </button>
+                                <div className="devis-totals">
+                                    <div className="total-row">
+                                        <span className="total-label">Total HT :</span>
+                                        <span className="total-value">{currentDevis.totalHT.toLocaleString('fr-FR')} FCFA</span>
                                     </div>
-                                )}
+                                    <div className="total-row">
+                                        <span className="total-label">TVA ({currentDevis.vat_rate || 18}%) :</span>
+                                        <span className="total-value">{currentDevis.tva.toLocaleString('fr-FR')} FCFA</span>
+                                    </div>
+                                    <div className="final-total-display">
+                                        <span className="final-label">TOTAL TTC</span>
+                                        <div className="final-line"></div>
+                                        <span className="final-value">{currentDevis.totalTTC.toLocaleString('fr-FR')} FCFA</span>
+                                    </div>
+                                </div>
+
+                                <div className="devis-actions">
+                                    <button className="btn-devis-secondary" onClick={() => handleDownloadPdf(currentDevis.id)}>
+                                        Télécharger le PDF
+                                    </button>
+                                    <button className="btn-devis-primary" onClick={handlePasserCommande}>
+                                        Valider et Passer la commande
+                                    </button>
+                                </div>
                             </div>
-                        </section>
+                        ) : (
+                            <div className="devis-empty-state">
+                                <div className="empty-icon">📄</div>
+                                <h3 className="empty-title">Aucun devis généré</h3>
+                                <p className="empty-message">Ajoutez des produits à votre panier et générez un devis pour le voir apparaître ici.</p>
+                            </div>
+                        )}
 
-                        {/* Modal for Devis Generation */}
-                        {showDevisModal && (
-                            <div className="devis-modal-overlay" onClick={() => setShowDevisModal(false)}>
-                                <div className="devis-modal" onClick={(e) => e.stopPropagation()}>
-                                    <div className="modal-header">
-                                        <h2 className="modal-title">Générer un nouveau devis</h2>
-                                        <button className="modal-close" onClick={() => setShowDevisModal(false)}>✕</button>
-                                    </div>
-
-                                    <form className="devis-form" onSubmit={handleSubmitDevis}>
-                                        <div className="form-group">
-                                            <label>Nom du Client</label>
-                                            <input
-                                                type="text"
-                                                className="form-input"
-                                                placeholder="Ex: Entreprise SARL"
-                                                value={devisForm.client}
-                                                onChange={(e) => setDevisForm({ ...devisForm, client: e.target.value })}
-                                                required
-                                            />
+                        {/* Recent Quotes List (Integrated below if needed, or keeping it clean) */}
+                        {quotes.length > 0 && !currentDevis && (
+                            <div className="recent-quotes-list" style={{ marginTop: '40px', maxWidth: '800px', margin: '40px auto' }}>
+                                <h3 style={{ marginBottom: '20px', color: '#1e3a8a' }}>Historique de vos devis</h3>
+                                <div className="tracking-list">
+                                    {quotes.map((quote) => (
+                                        <div
+                                            key={quote.id}
+                                            className="tracking-item"
+                                            onClick={() => handleSelectQuote(quote.id)}
+                                        >
+                                            <span className="tracking-ref">{quote.quote_number}</span>
+                                            <span className="tracking-date">{new Date(quote.created_at).toLocaleDateString('fr-FR')}</span>
                                         </div>
-
-                                        <div className="form-group">
-                                            <label>Adresse du Client</label>
-                                            <textarea
-                                                className="form-textarea"
-                                                placeholder="Ex: 10 Avenue 3, 75001 Paris"
-                                                rows="2"
-                                                value={devisForm.address}
-                                                onChange={(e) => setDevisForm({ ...devisForm, address: e.target.value })}
-                                                required
-                                            ></textarea>
-                                        </div>
-
-                                        <div className="form-group">
-                                            <label>Produits / Services</label>
-                                            <div className="products-list">
-                                                {devisForm.products.map((product, index) => (
-                                                    <div key={index} className="product-row">
-                                                        <input
-                                                            type="text"
-                                                            className="form-input product-name-input"
-                                                            placeholder="Nom du produit"
-                                                            value={product.name}
-                                                            onChange={(e) => handleProductChange(index, 'name', e.target.value)}
-                                                            required
-                                                        />
-                                                        <input
-                                                            type="number"
-                                                            className="form-input product-qty-input"
-                                                            placeholder="Qté"
-                                                            min="1"
-                                                            value={product.quantity}
-                                                            onChange={(e) => handleProductChange(index, 'quantity', parseInt(e.target.value) || 1)}
-                                                            required
-                                                        />
-                                                        <input
-                                                            type="number"
-                                                            className="form-input product-price-input"
-                                                            placeholder="Prix unitaire"
-                                                            min="0"
-                                                            step="0.01"
-                                                            value={product.unitPrice}
-                                                            onChange={(e) => handleProductChange(index, 'unitPrice', parseFloat(e.target.value) || 0)}
-                                                            required
-                                                        />
-                                                        {devisForm.products.length > 1 && (
-                                                            <button
-                                                                type="button"
-                                                                className="btn-remove-product"
-                                                                onClick={() => handleRemoveProduct(index)}
-                                                            >
-                                                                ✕
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <button type="button" className="btn-add-product" onClick={handleAddProduct}>
-                                                + Ajouter un produit
-                                            </button>
-                                        </div>
-
-                                        <div className="devis-preview">
-                                            <div className="preview-row">
-                                                <span>Total HT:</span>
-                                                <span className="preview-value">{calculateTotals().totalHT.toFixed(2)} $</span>
-                                            </div>
-                                            <div className="preview-row">
-                                                <span>TVA (20%):</span>
-                                                <span className="preview-value">{calculateTotals().tva.toFixed(2)} $</span>
-                                            </div>
-                                            <div className="preview-row preview-total">
-                                                <span>Total TTC:</span>
-                                                <span className="preview-value">{calculateTotals().totalTTC.toFixed(2)} $</span>
-                                            </div>
-                                        </div>
-
-                                        <div className="modal-actions">
-                                            <button type="button" className="btn-modal-cancel" onClick={() => setShowDevisModal(false)}>
-                                                Annuler
-                                            </button>
-                                            <button type="submit" className="btn-modal-submit">
-                                                Générer le Devis
-                                            </button>
-                                        </div>
-                                    </form>
+                                    ))}
                                 </div>
                             </div>
                         )}
-                    </>
+
+                        {quotes.length > 0 && currentDevis && (
+                            <button
+                                className="btn-back-profile"
+                                style={{ position: 'fixed', bottom: '30px', right: '30px', margin: 0, zIndex: 100 }}
+                                onClick={() => setCurrentDevis(null)}
+                                title="Voir l'historique des devis"
+                            >
+                                <span>📋</span>
+                            </button>
+                        )}
+                    </section>
                 )}
 
                 {activeMenu === 'retours' && (
@@ -1046,8 +1171,8 @@ function DashboardPage() {
                                     <div className="large-avatar">
                                         <img src="https://ui-avatars.com/api/?name=User&background=1e3a8a&color=fff&size=128" alt="User" />
                                     </div>
-                                    <h2 className="profile-name">{userData.name}</h2>
-                                    <p className="profile-role">{userData.role}</p>
+                                    <h2 className="profile-name">{user.name}</h2>
+                                    <p className="profile-role">{user.role}</p>
                                     <div className="profile-badges">
                                         <span className="badge-premium">Client Premium</span>
                                     </div>
@@ -1072,23 +1197,23 @@ function DashboardPage() {
                                     <div className="details-grid">
                                         <div className="detail-item">
                                             <label>Nom complet</label>
-                                            <p>{userData.name}</p>
+                                            <p>{user.name}</p>
                                         </div>
                                         <div className="detail-item">
                                             <label>Email Professionnel</label>
-                                            <p>{userData.email}</p>
+                                            <p>{user.email}</p>
                                         </div>
                                         <div className="detail-item">
                                             <label>Entreprise</label>
-                                            <p>{userData.company}</p>
+                                            <p>{user.role === 'client' ? user.company?.name : 'F-PRO Solutions'}</p>
                                         </div>
                                         <div className="detail-item">
                                             <label>Téléphone</label>
-                                            <p>{userData.phone}</p>
+                                            <p>{user.phone || '+226 XX XX XX XX'}</p>
                                         </div>
                                         <div className="detail-item">
                                             <label>Membre depuis</label>
-                                            <p>{userData.joinDate}</p>
+                                            <p>{user.joinDate || '2024'}</p>
                                         </div>
                                     </div>
                                     <button className="btn-edit-profile">Modifier mes informations</button>

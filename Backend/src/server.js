@@ -111,6 +111,14 @@ const rentalRoutes = require('./routes/rentalRoutes');
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/interventions', interventionRoutes);
 app.use('/api/rentals', rentalRoutes);
+
+// Dashboard Routes
+const dashboardRoutes = require('./routes/dashboardRoutes');
+const productRoutes = require('./routes/productRoutes');
+
+app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/products', productRoutes);
+
 // ============================================
 
 app.use((req, res) => {

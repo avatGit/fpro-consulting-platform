@@ -28,10 +28,21 @@ class OrderController {
 
     async listUserOrders(req, res) {
         try {
-            const { Order } = require('../models');
-            const orders = await Order.findAll({ where: { user_id: req.userId } });
+            const { Order, OrderItem, Product } = require('../models');
+            console.log(`Fetching orders for company_id: ${req.user.company_id}`);
+            const orders = await Order.findAll({
+                where: { company_id: req.user.company_id },
+                include: [{
+                    model: OrderItem,
+                    as: 'items',
+                    include: [{ model: Product, as: 'product' }]
+                }],
+                order: [['created_at', 'DESC']]
+            });
+            console.log(`Found ${orders.length} orders for company ${req.user.company_id}`);
             return ResponseHandler.success(res, orders, 'Liste des commandes récupérée');
         } catch (error) {
+            console.error('Error listing user orders:', error);
             return ResponseHandler.serverError(res, error);
         }
     }
