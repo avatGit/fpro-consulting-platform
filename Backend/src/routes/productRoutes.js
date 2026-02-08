@@ -8,13 +8,19 @@ const authMiddleware = require('../middleware/authMiddleware');
  * @desc    Get all active products
  * @access  Private (any authenticated user can see products)
  */
-router.get('/', authMiddleware.authenticate, productController.getAllProducts);
+const { authenticate } = require('../middleware/authMiddleware');
+const { authorize } = require('../middleware/rbacMiddleware');
 
-/**
- * @route   GET /api/products/:id
- * @desc    Get product by ID
- * @access  Private
- */
-router.get('/:id', authMiddleware.authenticate, productController.getProductById);
+router.use(authenticate);
+
+router.get('/', productController.getAllProducts);
+router.get('/:id', productController.getProductById);
+
+// Admin & Agent can create/update
+router.post('/', authorize('admin', 'agent'), productController.createProduct);
+router.put('/:id', authorize('admin', 'agent'), productController.updateProduct);
+
+// Only Admin can delete
+router.delete('/:id', authorize('admin'), productController.deleteProduct);
 
 module.exports = router;

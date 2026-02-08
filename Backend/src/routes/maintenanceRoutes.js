@@ -8,48 +8,14 @@ const { createMaintenanceSchema, assignTechnicianSchema } = require('../validato
 
 router.use(authenticate);
 
-/**
- * @swagger
- * /api/maintenance:
- *   post:
- *     summary: Créer une demande de maintenance
- *     tags: [Maintenance]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [description]
- *             properties:
- *               description: { type: string }
- *               priority: { type: string, enum: [low, medium, high, urgent] }
- *               request_type: { type: string }
- *     responses:
- *       201:
- *         description: Demande créée
- */
 router.post('/', authorize('client'), validate(createMaintenanceSchema), maintenanceController.createRequest);
 router.get('/', maintenanceController.listUserRequests);
 
-/**
- * @swagger
- * /api/maintenance/{id}/auto-assign:
- *   post:
- *     summary: Assigner automatiquement un technicien
- *     tags: [Maintenance]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string, format: uuid }
- *     responses:
- *       200:
- *         description: Technicien assigné
- */
-router.post('/:id/auto-assign', maintenanceController.autoAssign);
+// Routes Admin & Agent
+router.get('/all', authorize('admin', 'agent'), maintenanceController.listAllRequests);
+router.post('/:id/assign', authorize('admin', 'agent'), validate(assignTechnicianSchema), maintenanceController.assignTechnician);
+router.post('/:id/auto-assign', authorize('admin', 'agent'), maintenanceController.autoAssign);
 
 router.get('/:id', maintenanceController.getRequest);
-router.post('/:id/assign', validate(assignTechnicianSchema), maintenanceController.assignTechnician);
 
 module.exports = router;

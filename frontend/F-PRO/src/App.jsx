@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import AdminLoginPage from './pages/AdminLoginPage'
 import AdminDashboardPage from './pages/AdminDashboardPage'
+import AgentDashboardPage from './pages/AgentDashboardPage'
 
 // Protected Route Component for Admin
 // Helper to get user role from token (simplified)
@@ -34,7 +35,9 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 
     if (allowedRoles && !allowedRoles.includes(userRole)) {
         // Redirect based on role or to home
-        return <Navigate to="/" replace />;
+        if (userRole === 'admin') return <Navigate to="/admin" replace />;
+        if (userRole === 'agent') return <Navigate to="/agent" replace />;
+        return <Navigate to="/dashboard" replace />;
     }
 
     return children;
@@ -48,18 +51,26 @@ function App() {
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/dashboard" element={
-                    <ProtectedRoute allowedRoles={['client']}>
+                    <ProtectedRoute allowedRoles={['client', 'admin', 'agent']}>
                         <DashboardPage />
                     </ProtectedRoute>
                 } />
 
-                {/* Admin Routes */}
-                <Route path="/admin/login" element={<AdminLoginPage />} />
-                <Route path="/admin/dashboard" element={
-                    <ProtectedRoute allowedRoles={['admin', 'agent']}>
+                {/* Admin & Agent Routes */}
+                <Route path="/admin" element={
+                    <ProtectedRoute allowedRoles={['admin']}>
                         <AdminDashboardPage />
                     </ProtectedRoute>
                 } />
+                <Route path="/agent" element={
+                    <ProtectedRoute allowedRoles={['agent', 'admin']}>
+                        <AgentDashboardPage />
+                    </ProtectedRoute>
+                } />
+
+                {/* Legacy redirect or alternate paths */}
+                <Route path="/admin/login" element={<AdminLoginPage />} />
+                <Route path="/admin/dashboard" element={<Navigate to="/admin" replace />} />
             </Routes>
         </Router>
     )

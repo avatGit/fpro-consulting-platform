@@ -56,6 +56,15 @@ class MaintenanceController {
             return ResponseHandler.error(res, error.message, 400);
         }
     }
+
+    async listAllRequests(req, res) {
+        try {
+            const requests = await maintenanceService.getAllRequests();
+            return ResponseHandler.success(res, requests, 'Liste de toutes les demandes récupérée');
+        } catch (error) {
+            return ResponseHandler.serverError(res, error);
+        }
+    }
 }
 
 module.exports = new MaintenanceController();

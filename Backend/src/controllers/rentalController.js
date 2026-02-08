@@ -30,6 +30,25 @@ class RentalController {
             return ResponseHandler.serverError(res, error);
         }
     }
+    async updateRentalStatus(req, res) {
+        try {
+            const { id } = req.params;
+            const { status } = req.body;
+            const rental = await rentalService.updateStatus(id, status);
+            return ResponseHandler.success(res, rental, 'Statut de la réservation mis à jour');
+        } catch (error) {
+            return ResponseHandler.serverError(res, error);
+        }
+    }
+
+    async listAllRentals(req, res) {
+        try {
+            const rentals = await rentalService.listAllRentals();
+            return ResponseHandler.success(res, rentals, 'Liste de toutes les réservations récupérée');
+        } catch (error) {
+            return ResponseHandler.serverError(res, error);
+        }
+    }
 }
 
 module.exports = new RentalController();

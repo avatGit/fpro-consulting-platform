@@ -63,12 +63,16 @@ function LoginPage() {
             localStorage.setItem('token', token)
             localStorage.setItem('refreshToken', refreshToken)
             localStorage.setItem('user', JSON.stringify(user))
-            // Basic admin check - ideally should be robust
+
+            // Redirect based on role
             if (user.role === 'admin') {
                 localStorage.setItem('isAdmin', 'true')
+                navigate('/admin')
+            } else if (user.role === 'agent' || user.role === 'technicien') {
+                navigate('/agent')
+            } else {
+                navigate('/dashboard')
             }
-
-            navigate('/dashboard')
         } catch (error) {
             console.error('Login error:', error)
             setErrors(prev => ({

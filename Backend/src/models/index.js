@@ -14,6 +14,9 @@ const Intervention = require('./Intervention');
 const InterventionReport = require('./InterventionReport');
 const Rental = require('./Rental');
 const RentalItem = require('./RentalItem');
+const AuditLog = require('./AuditLog');
+const Invoice = require('./Invoice');
+const SystemSetting = require('./SystemSetting');
 
 // ============================================
 // DÉFINITION DES RELATIONS
@@ -94,6 +97,20 @@ RentalItem.belongsTo(Rental, { foreignKey: 'rental_id', as: 'rental' });
 Product.hasMany(RentalItem, { foreignKey: 'product_id', as: 'rental_items' });
 RentalItem.belongsTo(Product, { foreignKey: 'product_id', as: 'product' });
 
+// --- AuditLog ---
+User.hasMany(AuditLog, { foreignKey: 'user_id', as: 'audit_logs' });
+AuditLog.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+
+// --- Invoice ---
+Order.hasOne(Invoice, { foreignKey: 'order_id', as: 'invoice' });
+Invoice.belongsTo(Order, { foreignKey: 'order_id', as: 'order' });
+
+Company.hasMany(Invoice, { foreignKey: 'company_id', as: 'invoices' });
+Invoice.belongsTo(Company, { foreignKey: 'company_id', as: 'company' });
+
+User.hasMany(Invoice, { foreignKey: 'created_by', as: 'created_invoices' });
+Invoice.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+
 // ============================================
 // SYNCHRONISATION
 // ============================================
@@ -129,6 +146,9 @@ module.exports = {
   InterventionReport,
   Rental,
   RentalItem,
+  AuditLog,
+  Invoice,
+  SystemSetting,
   syncModels,
   Sequelize
 };

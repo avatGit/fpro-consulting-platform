@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react'
 import api from '../services/api'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo'
 import './DashboardPage.css'
 
 function DashboardPage() {
+    const navigate = useNavigate()
     const [activeMenu, setActiveMenu] = useState('dashboard')
     const [previousMenu, setPreviousMenu] = useState('dashboard')
     const [loading, setLoading] = useState(true)
@@ -56,6 +57,19 @@ function DashboardPage() {
         email: 'email@exemple.com',
         role: 'client'
     })
+    const [editProfileMode, setEditProfileMode] = useState(false)
+    const [profileFormData, setProfileFormData] = useState({
+        first_name: '',
+        last_name: '',
+        phone: '',
+        email: ''
+    })
+    const [passwordFormData, setPasswordFormData] = useState({
+        current_password: '',
+        new_password: '',
+        confirm_password: ''
+    })
+    const [showPasswordModal, setShowPasswordModal] = useState(false)
 
     // 1. Initial Load: User Info
     useEffect(() => {
@@ -97,6 +111,97 @@ function DashboardPage() {
             }
         }
     }, [])
+
+    useEffect(() => {
+        if (activeMenu === 'profile' && user) {
+            setProfileFormData({
+                first_name: user.first_name || '',
+                last_name: user.last_name || '',
+                phone: user.phone || '',
+                email: user.email || ''
+            })
+        }
+    }, [activeMenu, user])
+
+    const handleUpdateProfile = async (e) => {
+        e.preventDefault()
+        try {
+            const response = await api.put('/auth/profile', profileFormData)
+            const updatedUser = response.data.data
+            const userName = updatedUser.name ||
+                (updatedUser.first_name && updatedUser.last_name ? `${updatedUser.first_name} ${updatedUser.last_name}` :
+                    updatedUser.first_name || updatedUser.last_name || 'Utilisateur');
+
+            const fullUser = {
+                ...updatedUser,
+                name: userName
+            }
+            setUser(fullUser)
+            localStorage.setItem('user', JSON.stringify(fullUser))
+            setEditProfileMode(false)
+            alert('Profil mis à jour avec succès !')
+        } catch (error) {
+            console.error(error)
+            alert(error.response?.data?.message || 'Erreur lors de la mise à jour du profil')
+        }
+    }
+
+    const handleChangePassword = async (e) => {
+        e.preventDefault()
+        if (passwordFormData.new_password !== passwordFormData.confirm_password) {
+            alert('Les nouveaux mots de passe ne correspondent pas')
+            return
+        }
+        try {
+            await api.post('/auth/change-password', {
+                current_password: passwordFormData.current_password,
+                new_password: passwordFormData.new_password
+            })
+            setShowPasswordModal(false)
+            setPasswordFormData({ current_password: '', new_password: '', confirm_password: '' })
+            alert('Mot de passe modifié avec succès !')
+        } catch (error) {
+            console.error(error)
+            alert(error.response?.data?.message || 'Erreur lors du changement de mot de passe')
+        }
+    }
+
+    const handleSwitchRole = async (newRole) => {
+        try {
+            const response = await api.put('/auth/update-role', { role: newRole })
+            const { token, user: updatedUser, refreshToken } = response.data.data
+
+            localStorage.setItem('token', token)
+            localStorage.setItem('refreshToken', refreshToken)
+
+            const userName = updatedUser.name ||
+                (updatedUser.first_name && updatedUser.last_name ? `${updatedUser.first_name} ${updatedUser.last_name}` :
+                    updatedUser.first_name || updatedUser.last_name || 'Utilisateur');
+
+            const fullUser = {
+                ...updatedUser,
+                name: userName
+            }
+            setUser(fullUser)
+            localStorage.setItem('user', JSON.stringify(fullUser))
+
+            if (newRole === 'admin' || newRole === 'agent') {
+                localStorage.setItem('isAdmin', 'true')
+                window.location.href = '/admin/dashboard'
+            } else {
+                localStorage.removeItem('isAdmin')
+                alert(`Rôle changé en ${newRole} !`)
+            }
+        } catch (error) {
+            console.error(error)
+            alert('Erreur lors du changement de rôle')
+        }
+    }
+
+    const handleLogout = () => {
+        localStorage.clear()
+        window.location.href = '/login'
+    }
 
     // Fetch Cart helper
     const fetchCart = async () => {
@@ -1169,23 +1274,23 @@ function DashboardPage() {
                                 <div className="profile-header-bg"></div>
                                 <div className="profile-main-info">
                                     <div className="large-avatar">
-                                        <img src="https://ui-avatars.com/api/?name=User&background=1e3a8a&color=fff&size=128" alt="User" />
+                                        <img src={`https://ui-avatars.com/api/?name=${(user && user.name ? user.name : 'Utilisateur').replace(' ', '+')}&background=1e3a8a&color=fff&size=128`} alt="User" />
                                     </div>
                                     <h2 className="profile-name">{user.name}</h2>
-                                    <p className="profile-role">{user.role}</p>
+                                    <p className="profile-role" style={{ textTransform: 'capitalize' }}>{user.role}</p>
                                     <div className="profile-badges">
-                                        <span className="badge-premium">Client Premium</span>
+                                        <span className="badge-premium">{user.role === 'client' ? 'Client Premium' : 'Staff F-PRO'}</span>
                                     </div>
                                 </div>
                                 <div className="profile-quick-stats">
                                     <div className="quick-stat">
-                                        <span className="stat-val">12</span>
+                                        <span className="stat-val">{stats[0].count}</span>
                                         <span className="stat-lbl">Commandes</span>
                                     </div>
                                     <div className="divider"></div>
                                     <div className="quick-stat">
-                                        <span className="stat-val">05</span>
-                                        <span className="stat-lbl">Demandes</span>
+                                        <span className="stat-val">{stats[2].count}</span>
+                                        <span className="stat-lbl">Interventions</span>
                                     </div>
                                 </div>
                             </div>
@@ -1193,30 +1298,82 @@ function DashboardPage() {
                             {/* Main Profile Details */}
                             <div className="profile-details-content">
                                 <div className="details-card">
-                                    <h3 className="card-title">Informations Personnelles</h3>
-                                    <div className="details-grid">
-                                        <div className="detail-item">
-                                            <label>Nom complet</label>
-                                            <p>{user.name}</p>
-                                        </div>
-                                        <div className="detail-item">
-                                            <label>Email Professionnel</label>
-                                            <p>{user.email}</p>
-                                        </div>
-                                        <div className="detail-item">
-                                            <label>Entreprise</label>
-                                            <p>{user.role === 'client' ? user.company?.name : 'F-PRO Solutions'}</p>
-                                        </div>
-                                        <div className="detail-item">
-                                            <label>Téléphone</label>
-                                            <p>{user.phone || '+226 XX XX XX XX'}</p>
-                                        </div>
-                                        <div className="detail-item">
-                                            <label>Membre depuis</label>
-                                            <p>{user.joinDate || '2024'}</p>
-                                        </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                        <h3 className="card-title" style={{ border: 'none', margin: 0 }}>Informations Personnelles</h3>
+                                        {!editProfileMode && (
+                                            <button className="btn-edit-profile" onClick={() => setEditProfileMode(true)}>Modifier</button>
+                                        )}
                                     </div>
-                                    <button className="btn-edit-profile">Modifier mes informations</button>
+
+                                    {editProfileMode ? (
+                                        <form onSubmit={handleUpdateProfile} className="profile-edit-form">
+                                            <div className="details-grid">
+                                                <div className="form-group">
+                                                    <label>Prénom</label>
+                                                    <input
+                                                        type="text"
+                                                        className="form-input"
+                                                        value={profileFormData.first_name}
+                                                        onChange={(e) => setProfileFormData({ ...profileFormData, first_name: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="form-group">
+                                                    <label>Nom</label>
+                                                    <input
+                                                        type="text"
+                                                        className="form-input"
+                                                        value={profileFormData.last_name}
+                                                        onChange={(e) => setProfileFormData({ ...profileFormData, last_name: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="form-group">
+                                                    <label>Email</label>
+                                                    <input
+                                                        type="email"
+                                                        className="form-input"
+                                                        value={profileFormData.email}
+                                                        onChange={(e) => setProfileFormData({ ...profileFormData, email: e.target.value })}
+                                                    />
+                                                </div>
+                                                <div className="form-group">
+                                                    <label>Téléphone</label>
+                                                    <input
+                                                        type="text"
+                                                        className="form-input"
+                                                        value={profileFormData.phone}
+                                                        onChange={(e) => setProfileFormData({ ...profileFormData, phone: e.target.value })}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div style={{ display: 'flex', gap: '10px' }}>
+                                                <button type="submit" className="btn-modal-submit">Enregistrer</button>
+                                                <button type="button" className="btn-modal-cancel" onClick={() => setEditProfileMode(false)}>Annuler</button>
+                                            </div>
+                                        </form>
+                                    ) : (
+                                        <div className="details-grid">
+                                            <div className="detail-item">
+                                                <label>Nom complet</label>
+                                                <p>{user.name}</p>
+                                            </div>
+                                            <div className="detail-item">
+                                                <label>Email Professionnel</label>
+                                                <p>{user.email}</p>
+                                            </div>
+                                            <div className="detail-item">
+                                                <label>Entreprise</label>
+                                                <p>{user.company?.name || 'F-PRO Solutions'}</p>
+                                            </div>
+                                            <div className="detail-item">
+                                                <label>Téléphone</label>
+                                                <p>{user.phone || '+226 XX XX XX XX'}</p>
+                                            </div>
+                                            <div className="detail-item">
+                                                <label>Membre depuis</label>
+                                                <p>{user.created_at ? new Date(user.created_at).getFullYear() : '2024'}</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
 
                                 <div className="details-card security-card">
@@ -1225,54 +1382,85 @@ function DashboardPage() {
                                         <div className="security-item">
                                             <div className="sec-info">
                                                 <h4>Mot de passe</h4>
-                                                <p>Dernière modification il y a 3 mois</p>
+                                                <p>Sécurisez votre compte avec un mot de passe fort</p>
                                             </div>
-                                            <button className="btn-outline-small">Changer</button>
+                                            <button className="btn-outline-small" onClick={() => setShowPasswordModal(true)}>Changer</button>
                                         </div>
-                                        <div className="security-item">
+                                        {/* Demo Role Switching */}
+                                        <div className="security-item" style={{ background: '#f0f9ff', border: '1px solid #bae6fd' }}>
                                             <div className="sec-info">
-                                                <h4>Authentification à deux facteurs</h4>
-                                                <p>Ajoutez une couche de sécurité supplémentaire</p>
+                                                <h4 style={{ color: '#0369a1' }}>Mode Développeur / Demo</h4>
+                                                <p style={{ color: '#0c4a6e' }}>Changer de rôle pour tester les différentes vues</p>
                                             </div>
-                                            <div className="toggle-switch">
-                                                <input type="checkbox" id="a2f-toggle" />
-                                                <label htmlFor="a2f-toggle"></label>
+                                            <div style={{ display: 'flex', gap: '5px' }}>
+                                                <select
+                                                    className="pref-select"
+                                                    value={user.role}
+                                                    onChange={(e) => handleSwitchRole(e.target.value)}
+                                                >
+                                                    <option value="client">Client</option>
+                                                    <option value="admin">Admin</option>
+                                                    <option value="agent">Agent</option>
+                                                    <option value="technicien">Technicien</option>
+                                                </select>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="details-card preferences-card">
-                                    <h3 className="card-title">Préférences</h3>
-                                    <div className="pref-settings">
-                                        <div className="pref-item">
-                                            <div className="pref-info">
-                                                <h4>Notifications Email</h4>
-                                                <p>Recevoir des alertes pour vos commandes</p>
-                                            </div>
-                                            <div className="toggle-switch">
-                                                <input type="checkbox" id="notif-toggle" defaultChecked />
-                                                <label htmlFor="notif-toggle"></label>
-                                            </div>
-                                        </div>
-                                        <div className="pref-item">
-                                            <div className="pref-info">
-                                                <h4>Langue de l'interface</h4>
-                                            </div>
-                                            <select className="pref-select">
-                                                <option value="fr">Français</option>
-                                                <option value="en">English</option>
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <button className="btn-logout-alt">Se déconnecter</button>
+                                <button className="btn-logout-alt" onClick={handleLogout}>Se déconnecter</button>
                             </div>
                         </div>
+
+                        {/* Password Modal */}
+                        {showPasswordModal && (
+                            <div className="devis-modal-overlay">
+                                <div className="devis-modal" style={{ maxWidth: '400px' }}>
+                                    <div className="modal-header">
+                                        <h2 className="modal-title">Changer le mot de passe</h2>
+                                        <button className="modal-close" onClick={() => setShowPasswordModal(false)}>×</button>
+                                    </div>
+                                    <form onSubmit={handleChangePassword} className="devis-form" style={{ marginTop: '20px' }}>
+                                        <div className="form-group">
+                                            <label>Mot de passe actuel</label>
+                                            <input
+                                                type="password"
+                                                className="form-input"
+                                                required
+                                                value={passwordFormData.current_password}
+                                                onChange={(e) => setPasswordFormData({ ...passwordFormData, current_password: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Nouveau mot de passe</label>
+                                            <input
+                                                type="password"
+                                                className="form-input"
+                                                required
+                                                value={passwordFormData.new_password}
+                                                onChange={(e) => setPasswordFormData({ ...passwordFormData, new_password: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label>Confirmer le mot de passe</label>
+                                            <input
+                                                type="password"
+                                                className="form-input"
+                                                required
+                                                value={passwordFormData.confirm_password}
+                                                onChange={(e) => setPasswordFormData({ ...passwordFormData, confirm_password: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="modal-actions">
+                                            <button type="button" className="btn-modal-cancel" onClick={() => setShowPasswordModal(false)}>Annuler</button>
+                                            <button type="submit" className="btn-modal-submit">Mettre à jour</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        )}
                     </section>
                 )}
-
             </main>
         </div>
     )

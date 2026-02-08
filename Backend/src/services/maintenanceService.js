@@ -80,6 +80,10 @@ class MaintenanceService {
 
         return await this.assignTechnician(requestId, technician.id);
     }
+
+    async getAllRequests() {
+        return await maintenanceRequestRepository.findAllWithDetails();
+    }
 }
 
 module.exports = new MaintenanceService();

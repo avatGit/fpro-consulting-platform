@@ -161,4 +161,30 @@ router.post('/logout',
   authController.logout
 );
 
+/**
+ * @swagger
+ * /api/auth/update-role:
+ *   put:
+ *     summary: Mettre à jour le rôle de l'utilisateur (démo)
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [role]
+ *             properties:
+ *               role: { type: string, enum: [admin, client, agent, technicien] }
+ *     responses:
+ *       200:
+ *         description: Rôle mis à jour
+ */
+router.put('/update-role',
+  authenticate,
+  authController.updateRole
+);
+
 module.exports = router;

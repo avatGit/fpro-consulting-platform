@@ -53,12 +53,16 @@ class OrderService {
         try {
             // Stock impact
             for (const item of order.items) {
-                if (item.product.type === 'product') {
+                if (item.product && item.product.type === 'product') {
                     const product = await productRepository.findById(item.product_id);
-                    if (product.stock_quantity < item.quantity) {
+                    if (product && product.stock_quantity < item.quantity) {
                         throw new Error(`Stock insuffisant pour ${product.name}`);
                     }
-                    await product.decrement('stock_quantity', { by: item.quantity, transaction });
+                    if (product) {
+                        await product.decrement('stock_quantity', { by: item.quantity, transaction });
+                    }
+                } else if (!item.product) {
+                    console.warn(`Product not found for order item ${item.id} (product_id: ${item.product_id})`);
                 }
             }
 
@@ -69,6 +73,18 @@ class OrderService {
             await transaction.rollback();
             throw error;
         }
+    }
+
+    async updateStatus(orderId, status) {
+        const order = await orderRepository.findWithDetails(orderId);
+        if (!order) throw new Error('Commande non trouvée');
+
+        await order.update({ status });
+        return await orderRepository.findWithDetails(orderId);
+    }
+
+    async listAllOrders() {
+        return await orderRepository.findAllWithDetails();
     }
 }
 

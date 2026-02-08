@@ -47,6 +47,17 @@ class RentalRepository extends BaseRepository {
 
         return conflictingItems.length === 0;
     }
+
+    async findAllWithDetails() {
+        return await this.model.findAll({
+            include: [
+                { model: RentalItem, as: 'items', include: [{ model: Product, as: 'product' }] },
+                { model: User, as: 'user' },
+                { model: Company, as: 'company' }
+            ],
+            order: [['created_at', 'DESC']]
+        });
+    }
 }
 
 module.exports = new RentalRepository();

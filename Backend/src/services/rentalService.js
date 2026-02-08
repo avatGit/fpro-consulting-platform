@@ -58,6 +58,16 @@ class RentalService {
         if (!rental) throw new Error('Réservation non trouvée');
         return await rental.update({ status: 'confirmed' });
     }
+
+    async listAllRentals() {
+        return await rentalRepository.findAllWithDetails();
+    }
+
+    async updateStatus(rentalId, status) {
+        const rental = await rentalRepository.findById(rentalId);
+        if (!rental) throw new Error('Réservation non trouvée');
+        return await rental.update({ status });
+    }
 }
 
 module.exports = new RentalService();

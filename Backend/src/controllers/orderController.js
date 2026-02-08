@@ -59,6 +59,28 @@ class OrderController {
             return ResponseHandler.serverError(res, error);
         }
     }
+    async updateOrderStatus(req, res) {
+        try {
+            const { id } = req.params;
+            const { status } = req.body;
+            const order = await orderService.updateStatus(id, status);
+            return ResponseHandler.success(res, order, 'Statut de la commande mis à jour');
+        } catch (error) {
+            return ResponseHandler.serverError(res, error);
+        }
+    }
+
+    async listAllOrders(req, res) {
+        try {
+            console.log('Admin requesting ALL orders...');
+            const orders = await orderService.listAllOrders();
+            console.log(`Admin found ${orders ? orders.length : 0} orders.`);
+            return ResponseHandler.success(res, orders, 'Liste de toutes les commandes récupérée');
+        } catch (error) {
+            console.error('Error listing all orders:', error);
+            return ResponseHandler.serverError(res, error);
+        }
+    }
 }
 
 module.exports = new OrderController();

@@ -1,0 +1,96 @@
+/* Reuse most of AdminDashboardPage.css but with Agent specific tweaks if needed */
+/* For now, keep it identical but maybe a different sidebar gradient to distinguish */
+
+.agent-dashboard-page {
+    display: flex;
+    min-height: 100vh;
+    background-color: var(--gray-50);
+}
+
+.agent-sidebar {
+    width: 260px;
+    background: linear-gradient(180deg, var(--primary-blue-dark) 0%, #000 100%);
+    position: fixed;
+    height: 100vh;
+    left: 0;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
+}
+
+.agent-sidebar-header {
+    padding: var(--spacing-xl);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.agent-badge-sidebar {
+    background: var(--white);
+    color: var(--primary-blue-dark);
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-align: center;
+    margin-top: var(--spacing-md);
+}
+
+.agent-nav {
+    flex: 1;
+    padding: var(--spacing-lg) 0;
+}
+
+.agent-nav-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-xl);
+    background: none;
+    border: none;
+    border-left: 3px solid transparent;
+    color: var(--white);
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    text-align: left;
+}
+
+.agent-nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.agent-nav-item.active {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-left-color: var(--white);
+    font-weight: 700;
+}
+
+.agent-main {
+    margin-left: 260px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.agent-header {
+    background: var(--white);
+    padding: var(--spacing-lg) var(--spacing-2xl);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--gray-200);
+}
+
+.agent-page-title {
+    font-size: var(--font-size-3xl);
+    font-weight: 800;
+    color: var(--primary-blue-dark);
+}
+
+.agent-content {
+    padding: var(--spacing-2xl);
+}

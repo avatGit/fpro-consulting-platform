@@ -43,8 +43,8 @@ const register = async (req, res) => {
     };
 
     const userData = {
-      first_name: 'Admin', // Default value since frontend doesn't provide it
-      last_name: companyName, // Default to company name
+      first_name: companyName, // Use company name as first_name
+      last_name: 'Client', // Default last name
       email: email,
       password: password,
       phone: phone
@@ -323,6 +323,44 @@ const logout = async (req, res) => {
   }
 };
 
+/**
+ * PUT /api/auth/update-role
+ * Mettre à jour le rôle de l'utilisateur (pour demo/test)
+ */
+const updateRole = async (req, res) => {
+  try {
+    const { role } = req.body;
+    const allowedRoles = ['admin', 'client', 'agent', 'technicien'];
+
+    if (!role || !allowedRoles.includes(role)) {
+      return ResponseHandler.error(res, 'Rôle invalide', 400);
+    }
+
+    const user = await User.findByPk(req.userId);
+    if (!user) {
+      return ResponseHandler.notFound(res, 'Utilisateur non trouvé');
+    }
+
+    await user.update({ role });
+
+    // Generate new tokens with new role
+    const token = generateToken(user.id, user.role);
+    const refreshToken = generateRefreshToken(user.id);
+
+    logger.info(`User role updated to ${role}: ${user.email}`);
+
+    return ResponseHandler.success(res, {
+      user: user.toJSON(),
+      token,
+      refreshToken
+    }, 'Rôle mis à jour avec succès');
+
+  } catch (error) {
+    logger.error('Update role error:', error);
+    return ResponseHandler.serverError(res, error);
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -330,5 +368,6 @@ module.exports = {
   updateProfile,
   changePassword,
   refreshToken,
-  logout
+  logout,
+  updateRole
 };

@@ -1,0 +1,464 @@
+/* ============================================
+   ADMIN DASHBOARD PAGE STYLES - REFACTORED
+   ============================================ */
+
+/* Main Layout */
+.admin-dashboard {
+    display: flex;
+    height: 100vh;
+    background: #F4F7FE;
+    /* Light gray background for content */
+    overflow: hidden;
+}
+
+/* Sidebar Styling */
+.admin-sidebar {
+    width: 290px;
+    background: #0A1931;
+    /* Deep Navy Blue */
+    display: flex;
+    flex-direction: column;
+    color: white;
+    transition: width 0.3s;
+    flex-shrink: 0;
+}
+
+.sidebar-header {
+    padding: 40px 30px;
+    margin-bottom: 20px;
+}
+
+.sidebar-header h2 {
+    font-size: 26px;
+    font-weight: 700;
+    margin: 0;
+    /* F-PRO styling handled by Logo component, but assuming text here */
+    color: white;
+    letter-spacing: 0.5px;
+}
+
+.sidebar-nav {
+    flex: 1;
+    padding: 0 16px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    /* Spacing between items */
+}
+
+.sidebar-nav button {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    /* Larger padding */
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    /* Design shows specific highlights, maybe indicator bar */
+    color: #A3AED0;
+    /* Gray text for inactive */
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+}
+
+.sidebar-nav button i {
+    font-size: 20px;
+    width: 24px;
+    text-align: center;
+}
+
+.sidebar-nav button:hover {
+    color: white;
+}
+
+.sidebar-nav button.active {
+    color: white;
+    font-weight: 700;
+    position: relative;
+}
+
+/* Active indicator - blue bar on right */
+.sidebar-nav button.active::after {
+    content: '';
+    position: absolute;
+    right: -16px;
+    /* Stick to right edge of sidebar padding context */
+    top: 50%;
+    transform: translateY(-50%);
+    height: 36px;
+    width: 4px;
+    background: #4318FF;
+    /* Bright blue indicator */
+    border-radius: 4px 0 0 4px;
+}
+
+.sidebar-footer {
+    padding: 30px;
+}
+
+.logout-btn {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #A3AED0;
+    background: transparent;
+    border: none;
+    font-size: 16px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.logout-btn:hover {
+    color: #EE5D50;
+    /* Red on hover */
+}
+
+/* Main Content Area */
+.admin-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    position: relative;
+}
+
+/* Header */
+.admin-header {
+    background: #F4F7FE;
+    /* Same as bg, blends in */
+    padding: 24px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    /* No border or shadow in this design style - floating elements */
+}
+
+.header-left h1 {
+    font-size: 14px;
+    color: #707EAE;
+    /* Grayish breadcrumb */
+    font-weight: 500;
+    margin: 0;
+}
+
+.header-left h2 {
+    font-size: 34px;
+    font-weight: 700;
+    color: #2B3674;
+    /* Dark blue title */
+    margin: 4px 0 0 0;
+}
+
+.header-right {
+    background: white;
+    padding: 10px;
+    border-radius: 30px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    box-shadow: 14px 17px 40px 4px rgba(112, 144, 176, 0.08);
+}
+
+.notification-btn {
+    background: transparent;
+    border: none;
+    color: #A3AED0;
+    font-size: 20px;
+    cursor: pointer;
+    position: relative;
+}
+
+.notification-badge {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    width: 8px;
+    height: 8px;
+    background: #EE5D50;
+    border-radius: 50%;
+}
+
+.user-profile {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #11047A;
+    /* Fallback */
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.user-profile img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Module Content Wrapper */
+.module-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 32px 32px 32px;
+}
+
+/* Dashboard Specifics */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    /* 4 cards top */
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.dashboard-sections-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    /* 2/3 Main chart/activity, 1/3 Side stats */
+    gap: 24px;
+}
+
+.dashboard-section {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0px 18px 40px rgba(112, 144, 176, 0.12);
+}
+
+.dashboard-section h2 {
+    font-size: 22px;
+    font-weight: 700;
+    color: #2B3674;
+    margin: 0 0 24px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Activity Timeline */
+.activity-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 0;
+    border-bottom: 1px solid #E9EDF7;
+}
+
+.activity-item:last-child {
+    border-bottom: none;
+}
+
+.activity-info {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.activity-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    background: #F4F7FE;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #4318FF;
+    font-weight: 700;
+}
+
+.activity-text h4 {
+    font-size: 16px;
+    font-weight: 700;
+    color: #2B3674;
+    margin: 0;
+}
+
+.activity-text p {
+    font-size: 14px;
+    color: #A3AED0;
+    margin: 4px 0 0 0;
+}
+
+.activity-time {
+    font-size: 12px;
+    color: #A3AED0;
+    font-weight: 500;
+}
+
+/* Toolbar adjustments */
+.module-toolbar {
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .dashboard-sections-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .stats-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-sidebar {
+        width: 0;
+        position: fixed;
+        z-index: 100;
+        height: 100%;
+    }
+
+    .admin-sidebar.open {
+        width: 290px;
+    }
+}
+
+/* =========================================
+   SETTINGS PAGE STYLING
+   ========================================= */
+.settings-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+    gap: 30px;
+    padding-bottom: 20px;
+}
+
+.settings-category {
+    background: white;
+    border-radius: 20px;
+    padding: 24px;
+    box-shadow: 0px 18px 40px rgba(112, 144, 176, 0.12);
+    height: 100%;
+    border: none;
+    /* Ensure no default border overrides */
+}
+
+.settings-category h3 {
+    color: #2B3674;
+    font-size: 18px;
+    font-weight: 700;
+    margin: 0 0 20px 0;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #E9EDF7;
+    text-transform: capitalize;
+}
+
+.settings-list {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.setting-item {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.setting-info h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #2B3674;
+    margin: 0 0 4px 0;
+}
+
+.setting-info p {
+    font-size: 12px;
+    color: #A3AED0;
+    margin: 0;
+}
+
+.setting-value input,
+.setting-value select {
+    width: 100%;
+    padding: 12px 20px;
+    border-radius: 16px;
+    border: 1px solid #E9EDF7;
+    background: #FFFFFF;
+    /* White background for input */
+    color: #2B3674;
+    font-weight: 500;
+    font-size: 14px;
+    transition: all 0.2s;
+}
+
+.setting-value input:focus,
+.setting-value select:focus {
+    border-color: #4318FF;
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(67, 24, 255, 0.1);
+}
+
+/* =========================================
+   TABLE & BADGE REFINEMENTS
+   ========================================= */
+/* Ensure table headers are strict */
+.data-table thead th {
+    font-size: 12px;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px;
+    color: #A3AED0 !important;
+    font-weight: 700 !important;
+    border-bottom: 1px solid #E9EDF7 !important;
+}
+
+/* Table Rows prominent */
+.data-table td {
+    color: #2B3674 !important;
+    font-weight: 700 !important;
+    font-size: 14px !important;
+}
+
+/* Name Columns often need to be bolder or have images */
+.user-cell,
+.product-cell {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.user-avatar-small {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: #4318FF;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.product-icon-small {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: #F4F7FE;
+    color: #4318FF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+/* Status Badges - Make them pill-shaped and strictly colored */
+.badge {
+    text-transform: capitalize;
+    padding: 6px 14px !important;
+    border-radius: 20px !important;
+}

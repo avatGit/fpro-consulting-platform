@@ -10,7 +10,7 @@ const authenticate = async (req, res, next) => {
   try {
     // 1. Récupérer le token depuis le header Authorization
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return ResponseHandler.unauthorized(res, 'Token manquant. Veuillez vous connecter.');
     }
@@ -70,7 +70,7 @@ const authenticate = async (req, res, next) => {
 const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
-    
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return next();
     }

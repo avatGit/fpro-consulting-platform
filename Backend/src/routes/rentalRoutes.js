@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const rentalController = require('../controllers/rentalController');
 const { authenticate } = require('../middleware/authMiddleware');
+const { authorize } = require('../middleware/rbacMiddleware');
 const { validate } = require('../validators/authValidators');
 const { createBookingSchema } = require('../validators/maintenanceValidators');
 
@@ -63,5 +64,9 @@ router.post('/', validate(createBookingSchema), rentalController.createBooking);
 router.get('/availability', rentalController.checkAvailability);
 
 router.post('/:id/confirm', rentalController.confirmBooking);
+
+// Routes Admin & Agent
+router.get('/all', authorize('admin', 'agent'), rentalController.listAllRentals);
+router.patch('/:id/status', authorize('admin', 'agent'), rentalController.updateRentalStatus);
 
 module.exports = router;

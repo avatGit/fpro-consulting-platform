@@ -81,10 +81,23 @@ function RegisterPage() {
             // Navigate to login page after successful registration
             navigate('/login')
         } catch (error) {
-            console.error('Registration error:', error)
+            console.error('Registration full error object:', error);
+            if (error.response) {
+                console.error('Response data:', error.response.data);
+                console.error('Response status:', error.response.status);
+                console.error('Response headers:', error.response.headers);
+            } else if (error.request) {
+                console.error('Request made but no response received:', error.request);
+            } else {
+                console.error('Error setting up request:', error.message);
+            }
+
+            const errorMessage = error.response?.data?.message ||
+                (error.response?.data?.errors ? error.response.data.errors[0].message : "Une erreur s'est produite lors de l'inscription");
+
             setErrors(prev => ({
                 ...prev,
-                submit: error.response?.data?.message || "Une erreur s'est produite lors de l'inscription"
+                submit: errorMessage
             }))
         } finally {
             setIsLoading(false)

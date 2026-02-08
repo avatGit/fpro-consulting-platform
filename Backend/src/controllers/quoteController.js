@@ -67,6 +67,73 @@ class QuoteController {
             return ResponseHandler.serverError(res, error);
         }
     }
+
+    /**
+     * Lister tous les devis (Admin uniquement)
+     */
+    async listAllQuotes(req, res) {
+        try {
+            const { Quote, QuoteItem, Product, User, Company } = require('../models');
+            const { status, page = 1, limit = 20 } = req.query;
+
+            const where = {};
+            if (status) where.status = status;
+
+            const offset = (parseInt(page) - 1) * parseInt(limit);
+
+            const { count, rows } = await Quote.findAndCountAll({
+                where,
+                include: [
+                    { model: User, as: 'user', attributes: ['first_name', 'last_name', 'email'] },
+                    { model: Company, as: 'company', attributes: ['name'] },
+                    { model: QuoteItem, as: 'items', include: [{ model: Product, as: 'product' }] }
+                ],
+                order: [['created_at', 'DESC']],
+                limit: parseInt(limit),
+                offset
+            });
+
+            return ResponseHandler.success(res, {
+                quotes: rows,
+                pagination: {
+                    total: count,
+                    page: parseInt(page),
+                    limit: parseInt(limit),
+                    totalPages: Math.ceil(count / parseInt(limit))
+                }
+            }, 'Liste de tous les devis récupérée');
+        } catch (error) {
+            return ResponseHandler.serverError(res, error);
+        }
+    }
+
+    /**
+     * Approuver un devis (Admin uniquement)
+     */
+    async approveQuote(req, res) {
+        try {
+            const { id } = req.params;
+            const quote = await quoteService.updateStatus(id, 'accepted');
+            return ResponseHandler.success(res, quote, 'Devis approuvé avec succès');
+        } catch (error) {
+            return ResponseHandler.serverError(res, error);
+        }
+    }
+
+    /**
+     * Rejeter un devis (Admin uniquement)
+     */
+    async rejectQuote(req, res) {
+        try {
+            const { id } = req.params;
+            const { reason } = req.body;
+            const quote = await quoteService.updateStatus(id, 'refused');
+            // TODO: Send notification to user with reason
+            return ResponseHandler.success(res, quote, 'Devis rejeté');
+        } catch (error) {
+            return ResponseHandler.serverError(res, error);
+        }
+    }
 }
 
 module.exports = new QuoteController();

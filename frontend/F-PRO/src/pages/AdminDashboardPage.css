@@ -7,7 +7,7 @@
 /* Sidebar */
 .admin-sidebar {
     width: 260px;
-    background: linear-gradient(180deg, #f59e0b 0%, #dc2626 100%);
+    background: linear-gradient(180deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
     position: fixed;
     height: 100vh;
     left: 0;
@@ -20,7 +20,7 @@
 
 .admin-sidebar-header {
     padding: var(--spacing-xl);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     position: relative;
 }
 
@@ -64,7 +64,7 @@
 }
 
 .admin-nav-item.active {
-    background-color: rgba(255, 255, 255, 0.2);
+    background-color: rgba(255, 255, 255, 0.15);
     border-left-color: var(--white);
     font-weight: 700;
 }
@@ -75,14 +75,14 @@
 
 .admin-sidebar-footer {
     padding: var(--spacing-xl);
-    border-top: 1px solid rgba(255, 255, 255, 0.2);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .btn-view-client {
     width: 100%;
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.1);
     color: var(--white);
-    border: 2px solid rgba(255, 255, 255, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
     padding: var(--spacing-md);
     border-radius: var(--radius-lg);
     font-weight: 700;
@@ -121,10 +121,7 @@
     font-size: var(--font-size-3xl);
     font-weight: 800;
     margin: 0;
-    background: linear-gradient(135deg, #f59e0b 0%, #dc2626 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    color: var(--primary-blue);
 }
 
 .admin-header-actions {
@@ -139,7 +136,7 @@
 }
 
 .btn-logout {
-    background: linear-gradient(135deg, #dc2626 0%, #991b1b 100%);
+    background: var(--error);
     color: var(--white);
     padding: var(--spacing-sm) var(--spacing-lg);
     border: none;
@@ -201,11 +198,11 @@
 }
 
 .stat-orange {
-    border-left-color: #f59e0b;
+    border-left-color: var(--primary-blue);
 }
 
 .stat-orange .stat-number {
-    color: #f59e0b;
+    color: var(--primary-blue);
 }
 
 .stat-blue {
@@ -260,7 +257,7 @@
     padding: var(--spacing-md);
     background: var(--gray-50);
     border-radius: var(--radius-lg);
-    border-left: 3px solid #f59e0b;
+    border-left: 3px solid var(--primary-blue);
 }
 
 .activity-icon {
@@ -295,7 +292,7 @@
 }
 
 .btn-add {
-    background: linear-gradient(135deg, #f59e0b 0%, #dc2626 100%);
+    background: var(--primary-blue);
     color: var(--white);
     padding: var(--spacing-md) var(--spacing-xl);
     border: none;
@@ -303,12 +300,12 @@
     font-weight: 700;
     cursor: pointer;
     transition: all 0.3s ease;
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
 }
 
 .btn-add:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.4);
+    box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
 }
 
 /* Data Table */
@@ -399,7 +396,7 @@
 
 .rental-price {
     font-weight: 700;
-    color: #f59e0b;
+    color: var(--primary-blue);
     margin: var(--spacing-md) 0;
 }
 
@@ -445,8 +442,8 @@
 
 .order-card.selected,
 .maintenance-card.selected {
-    background: #fef3c7;
-    border-left-color: #f59e0b;
+    background: #eff6ff;
+    border-left-color: var(--primary-blue);
 }
 
 .order-header,
@@ -568,7 +565,7 @@
 
 .detail-group select:focus {
     outline: none;
-    border-color: #f59e0b;
+    border-color: var(--primary-blue);
 }
 
 /* Modal */
@@ -617,7 +614,7 @@
 
 .modal-content input:focus {
     outline: none;
-    border-color: #f59e0b;
+    border-color: var(--primary-blue);
 }
 
 .modal-actions {
@@ -642,7 +639,7 @@
 }
 
 .modal-actions button[type="submit"] {
-    background: linear-gradient(135deg, #f59e0b 0%, #dc2626 100%);
+    background: var(--primary-blue);
     color: var(--white);
 }
 

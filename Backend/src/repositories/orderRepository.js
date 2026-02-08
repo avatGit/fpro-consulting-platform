@@ -37,6 +37,17 @@ class OrderRepository extends BaseRepository {
         }
         return order;
     }
+
+    async findAllWithDetails() {
+        return await this.model.findAll({
+            include: [
+                { model: OrderItem, as: 'items', include: [{ model: Product, as: 'product' }] },
+                { model: Company, as: 'company' },
+                { model: User, as: 'user' }
+            ],
+            order: [['created_at', 'DESC']]
+        });
+    }
 }
 
 module.exports = new OrderRepository();

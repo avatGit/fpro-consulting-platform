@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const orderController = require('../controllers/orderController');
 const { authenticate } = require('../middleware/authMiddleware');
+const { authorize } = require('../middleware/rbacMiddleware');
 
 const { validate } = require('../validators/authValidators');
 const { createOrderSchema } = require('../validators/salesValidators');
@@ -29,24 +30,21 @@ router.use(authenticate);
  */
 router.post('/', validate(createOrderSchema), orderController.createFromQuote);
 
+router.get('/', orderController.listUserOrders);
+
+// Routes Admin & Agent
+router.get('/all', authorize('admin', 'agent'), orderController.listAllOrders);
+router.patch('/:id/status', authorize('admin', 'agent'), orderController.updateOrderStatus);
+
 /**
  * @swagger
  * /api/orders/{id}/validate:
  *   post:
  *     summary: Valider une commande (impacte le stock)
  *     tags: [Orders]
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema: { type: string, format: uuid }
- *     responses:
- *       200:
- *         description: Commande validée
  */
-router.post('/:id/validate', orderController.validateOrder);
+router.post('/:id/validate', authorize('admin'), orderController.validateOrder);
 
-router.get('/', orderController.listUserOrders);
 router.get('/:id', orderController.getOrder);
 
 module.exports = router;
