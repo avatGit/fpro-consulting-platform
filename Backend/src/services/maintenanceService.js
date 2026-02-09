@@ -74,8 +74,13 @@ class MaintenanceService {
         const skillsNeeded = request.request_type ? [request.request_type] : [];
         const technician = await technicianRepository.findLeastLoaded(skillsNeeded);
 
+        if (!technician && skillsNeeded.length > 0) {
+            console.log('No technician with matching skills, falling back to any available technician');
+            technician = await technicianRepository.findLeastLoaded([]);
+        }
+
         if (!technician) {
-            throw new Error('Aucun technicien disponible ne correspond aux critères');
+            throw new Error('Aucun technicien disponible pour le moment');
         }
 
         return await this.assignTechnician(requestId, technician.id);

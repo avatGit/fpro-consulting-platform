@@ -2,6 +2,19 @@ const orderService = require('../services/orderService');
 const ResponseHandler = require('../utils/responseHandler');
 
 class OrderController {
+    async createFromCart(req, res) {
+        try {
+            const { companyId } = req.body;
+            const order = await orderService.createFromCart(req.userId, companyId);
+            return ResponseHandler.created(res, order, 'Commande créée avec succès');
+        } catch (error) {
+            if (error.message === 'Le panier est vide') {
+                return ResponseHandler.error(res, error.message, 400);
+            }
+            return ResponseHandler.serverError(res, error);
+        }
+    }
+
     async createFromQuote(req, res) {
         try {
             const { quoteId } = req.body;

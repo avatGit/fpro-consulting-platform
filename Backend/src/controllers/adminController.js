@@ -57,12 +57,12 @@ class AdminController {
                     }
                 },
                 attributes: [
-                    [sequelize.fn('DATE', sequelize.col('created_at')), 'date'],
-                    [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
-                    [sequelize.fn('SUM', sequelize.col('total_amount')), 'revenue']
+                    [sequelize.fn('DATE', sequelize.col('Order.created_at')), 'date'],
+                    [sequelize.fn('COUNT', sequelize.col('Order.id')), 'count'],
+                    [sequelize.fn('SUM', sequelize.col('Order.total_amount')), 'revenue']
                 ],
-                group: [sequelize.fn('DATE', sequelize.col('created_at'))],
-                order: [[sequelize.fn('DATE', sequelize.col('created_at')), 'ASC']]
+                group: [sequelize.fn('DATE', sequelize.col('Order.created_at'))],
+                order: [[sequelize.fn('DATE', sequelize.col('Order.created_at')), 'ASC']]
             });
 
             // Nouveaux utilisateurs (derniers 30 jours)

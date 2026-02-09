@@ -65,6 +65,15 @@ class MaintenanceController {
             return ResponseHandler.serverError(res, error);
         }
     }
+
+    async listAvailableTechnicians(req, res) {
+        try {
+            const technicians = await require('../repositories/technicianRepository').findAvailable();
+            return ResponseHandler.success(res, technicians, 'Liste des techniciens disponibles récupérée');
+        } catch (error) {
+            return ResponseHandler.serverError(res, error);
+        }
+    }
 }
 
 module.exports = new MaintenanceController();

@@ -29,6 +29,7 @@ router.use(authenticate);
  *         description: Commande créée
  */
 router.post('/', validate(createOrderSchema), orderController.createFromQuote);
+router.post('/from-cart', orderController.createFromCart);
 
 router.get('/', orderController.listUserOrders);
 

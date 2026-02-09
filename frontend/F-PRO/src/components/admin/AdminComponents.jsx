@@ -16,7 +16,7 @@ export const StatCard = ({ icon, value, label, trend, trendUp, color = 'primary'
                 <div className="stat-value">{value}</div>
                 {trend && (
                     <div className={`stat-trend ${trendUp ? 'trend-up' : 'trend-down'}`}>
-                        <i className={`fas fa-caret-${trendUp ? 'up' : 'down'}`}></i>
+                        <i className={`fa-solid fa-caret-${trendUp ? 'up' : 'down'}`}></i>
                         <span>{trend}</span>
                     </div>
                 )}
@@ -50,7 +50,7 @@ export const DataTable = ({
     if (!data || data.length === 0) {
         return (
             <div className="table-empty">
-                <i className="fas fa-inbox"></i>
+                <i className="fa-solid fa-inbox"></i>
                 <p>{emptyMessage}</p>
             </div>
         );
@@ -69,7 +69,7 @@ export const DataTable = ({
                         {columns.map((col, idx) => (
                             <th key={idx} className={col.className || ''}>
                                 {col.label}
-                                {col.sortable && <i className="fas fa-sort"></i>}
+                                {col.sortable && <i className="fa-solid fa-sort"></i>}
                             </th>
                         ))}
                     </tr>
@@ -122,7 +122,7 @@ export const Modal = ({ isOpen, onClose, title, children, size = 'medium', foote
                 <div className="modal-header">
                     <h3>{title}</h3>
                     <button className="modal-close" onClick={onClose}>
-                        <i className="fas fa-times"></i>
+                        <i className="fa-solid fa-times"></i>
                     </button>
                 </div>
                 <div className="modal-body">
@@ -154,18 +154,27 @@ export const Badge = ({ text, variant = 'default' }) => {
  * Action Button Component
  * Icon button for table actions
  */
-export const ActionButton = ({ icon, onClick, tooltip, variant = 'default', disabled = false }) => {
+/**
+ * Action Button Component
+ * Professional icon button for table actions
+ */
+export const ActionButton = ({ icon, onClick, tooltip, variant = 'default', disabled = false, loading = false }) => {
     return (
         <button
-            className={`action-btn action-btn-${variant}`}
+            className={`action-btn action-btn-${variant} ${loading ? 'loading' : ''}`}
             onClick={(e) => {
+                e.preventDefault();
                 e.stopPropagation();
-                onClick();
+                if (!disabled && !loading) onClick();
             }}
             title={tooltip}
-            disabled={disabled}
+            disabled={disabled || loading}
         >
-            <i className={icon}></i>
+            {loading ? (
+                <i className="fa-solid fa-circle-notch fa-spin"></i>
+            ) : (
+                <i className={icon}></i>
+            )}
         </button>
     );
 };
@@ -176,7 +185,7 @@ export const ActionButton = ({ icon, onClick, tooltip, variant = 'default', disa
 export const SearchBar = ({ value, onChange, placeholder = 'Rechercher...' }) => {
     return (
         <div className="search-bar">
-            <i className="fas fa-search"></i>
+            <i className="fa-solid fa-search"></i>
             <input
                 type="text"
                 value={value}
@@ -231,7 +240,7 @@ export const Pagination = ({ currentPage, totalPages, onPageChange }) => {
                 disabled={currentPage === 1}
                 className="pagination-btn"
             >
-                <i className="fas fa-chevron-left"></i>
+                <i className="fa-solid fa-chevron-left"></i>
             </button>
 
             {startPage > 1 && (
@@ -265,7 +274,7 @@ export const Pagination = ({ currentPage, totalPages, onPageChange }) => {
                 disabled={currentPage === totalPages}
                 className="pagination-btn"
             >
-                <i className="fas fa-chevron-right"></i>
+                <i className="fa-solid fa-chevron-right"></i>
             </button>
         </div>
     );

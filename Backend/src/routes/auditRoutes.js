@@ -4,9 +4,9 @@ const auditController = require('../controllers/auditController');
 const { authenticate } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/rbacMiddleware');
 
-// Toutes les routes nécessitent d'être admin
+// Toutes les routes nécessitent d'être admin ou agent
 router.use(authenticate);
-router.use(authorize('admin'));
+router.use(authorize('admin', 'agent'));
 
 /**
  * @swagger

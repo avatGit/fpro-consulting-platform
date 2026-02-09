@@ -22,7 +22,7 @@ class QuoteService {
                 quote_number: quoteNumber,
                 user_id: userId,
                 company_id: companyId,
-                status: 'draft',
+                status: 'pending',
                 subtotal,
                 vat_rate: vatRate,
                 vat_amount: vatAmount,
@@ -56,6 +56,40 @@ class QuoteService {
 
         // Business rule: only draft can be sent, etc.
         return await quoteRepository.update(quoteId, { status });
+    }
+
+    async updateQuote(quoteId, data) {
+        const quote = await quoteRepository.findById(quoteId);
+        if (!quote) throw new Error('Devis non trouvé');
+
+        const { items, ...quoteData } = data;
+
+        const transaction = await sequelize.transaction();
+        try {
+            // Update items if provided
+            if (items && items.length > 0) {
+                // Remove old items
+                const { QuoteItem } = require('../models');
+                await QuoteItem.destroy({ where: { quote_id: quoteId }, transaction });
+
+                // Create new items
+                for (const item of items) {
+                    await QuoteItem.create({
+                        quote_id: quoteId,
+                        ...item
+                    }, { transaction });
+                }
+            }
+
+            // Update quote metadata
+            await quoteRepository.update(quoteId, quoteData, { transaction });
+
+            await transaction.commit();
+            return await quoteRepository.findWithDetails(quoteId);
+        } catch (error) {
+            await transaction.rollback();
+            throw error;
+        }
     }
 
     async getQuoteDetails(quoteId) {

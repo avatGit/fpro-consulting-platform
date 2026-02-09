@@ -1,0 +1,181 @@
+.technician-dashboard {
+    min-height: 100vh;
+    background-color: #F1F5F9;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.tech-header {
+    background: #1E3A8A;
+    color: white;
+    padding: 1rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.tech-user-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    font-size: 0.9rem;
+}
+
+.btn-logout {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+.tech-main {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.tech-tabs {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    background: white;
+    padding: 5px;
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.tech-tab {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    font-weight: 600;
+    color: #64748B;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tech-tab.active {
+    background: #1E3A8A;
+    color: white;
+}
+
+.intervention-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.intervention-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    border-left: 5px solid #CBD5E1;
+}
+
+.intervention-card.status-in_progress {
+    border-left-color: #3B82F6;
+}
+
+.intervention-card.status-completed {
+    border-left-color: #10B981;
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+}
+
+.ref {
+    font-family: monospace;
+    font-weight: 700;
+    color: #1E3A8A;
+    background: #EFF6FF;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.badge {
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    font-weight: 800;
+    padding: 4px 8px;
+    border-radius: 9999px;
+}
+
+.badge-scheduled {
+    background: #FEE2E2;
+    color: #991B1B;
+}
+
+.badge-in_progress {
+    background: #DBEAFE;
+    color: #1E40AF;
+}
+
+.badge-completed {
+    background: #D1FAE5;
+    color: #065F46;
+}
+
+.card-body h3 {
+    margin: 0 0 10px 0;
+    font-size: 1.1rem;
+    color: #1E293B;
+}
+
+.description {
+    font-size: 0.9rem;
+    color: #64748B;
+    margin-bottom: 15px;
+}
+
+.meta {
+    display: flex;
+    gap: 20px;
+    font-size: 0.85rem;
+    color: #475569;
+}
+
+.card-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 10px;
+}
+
+.btn-tech {
+    flex: 1;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: transform 0.1s;
+}
+
+.btn-tech:active {
+    transform: scale(0.98);
+}
+
+.btn-start {
+    background: #3B82F6;
+    color: white;
+}
+
+.btn-complete {
+    background: #10B981;
+    color: white;
+}
+
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #94A3B8;
+    background: white;
+    border-radius: 12px;
+}

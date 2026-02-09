@@ -7,6 +7,7 @@ import DashboardPage from './pages/DashboardPage'
 import AdminLoginPage from './pages/AdminLoginPage'
 import AdminDashboardPage from './pages/AdminDashboardPage'
 import AgentDashboardPage from './pages/AgentDashboardPage'
+import TechnicianDashboardPage from './pages/TechnicianDashboardPage'
 
 // Protected Route Component for Admin
 // Helper to get user role from token (simplified)
@@ -65,6 +66,11 @@ function App() {
                 <Route path="/agent" element={
                     <ProtectedRoute allowedRoles={['agent', 'admin']}>
                         <AgentDashboardPage />
+                    </ProtectedRoute>
+                } />
+                <Route path="/technician" element={
+                    <ProtectedRoute allowedRoles={['technicien', 'admin']}>
+                        <TechnicianDashboardPage />
                     </ProtectedRoute>
                 } />
 

@@ -34,6 +34,15 @@ class InterventionController {
             return ResponseHandler.serverError(res, error);
         }
     }
+
+    async listMyInterventions(req, res) {
+        try {
+            const interventions = await interventionService.getTechnicianInterventions(req.userId);
+            return ResponseHandler.success(res, interventions, 'Liste de vos interventions récupérée');
+        } catch (error) {
+            return ResponseHandler.serverError(res, error);
+        }
+    }
 }
 
 module.exports = new InterventionController();

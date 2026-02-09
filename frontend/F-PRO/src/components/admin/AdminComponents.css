@@ -142,8 +142,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 9999;
     backdrop-filter: blur(4px);
+    pointer-events: auto;
+}
+
+/* Force Font Awesome family */
+[class^="fa-"],
+[class*=" fa-"] {
+    font-family: 'Font Awesome 6 Free', 'Font Awesome 5 Free', sans-serif !important;
+    font-weight: 900 !important;
 }
 
 .modal-content {
@@ -224,29 +232,91 @@
 /* Action Buttons Container */
 .action-buttons {
     display: flex;
-    gap: 8px;
+    gap: 12px;
     align-items: center;
     justify-content: flex-start;
 }
 
 /* Action Button */
 .action-btn {
-    background: transparent;
-    border: none;
-    color: var(--text-gray);
-    cursor: pointer;
-    font-size: 18px;
-    padding: 8px;
-    border-radius: 8px;
-    transition: all 0.2s;
-    display: inline-flex;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
     align-items: center;
     justify-content: center;
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    border: 1px solid transparent;
+    font-size: 16px;
+    position: relative;
+    background: #f8fafc;
+    color: #64748b;
 }
 
-.action-btn:hover {
-    background: #F4F7FE;
-    color: var(--accent-blue);
+.action-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.action-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: #f1f5f9;
+}
+
+.action-btn-primary {
+    background: rgba(59, 130, 246, 0.1);
+    color: #2563eb;
+}
+
+.action-btn-primary:hover:not(:disabled) {
+    background: #2563eb;
+    color: white;
+}
+
+.action-btn-success {
+    background: rgba(16, 185, 129, 0.1);
+    color: #10b981;
+}
+
+.action-btn-success:hover:not(:disabled) {
+    background: #10b981;
+    color: white;
+}
+
+.action-btn-danger {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+.action-btn-danger:hover:not(:disabled) {
+    background: #ef4444;
+    color: white;
+}
+
+.action-btn-warning {
+    background: rgba(245, 158, 11, 0.1);
+    color: #f59e0b;
+}
+
+.action-btn-warning:hover:not(:disabled) {
+    background: #f59e0b;
+    color: white;
+}
+
+.action-btn-info {
+    background: rgba(14, 165, 233, 0.1);
+    color: #0ea5e9;
+}
+
+.action-btn-info:hover:not(:disabled) {
+    background: #0ea5e9;
+    color: white;
 }
 
 /* Search Bar */

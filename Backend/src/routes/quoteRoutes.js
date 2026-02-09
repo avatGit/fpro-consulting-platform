@@ -63,11 +63,12 @@ router.get('/', quoteController.listUserQuotes);
 router.get('/:id/pdf', quoteController.downloadPdf);
 
 router.get('/:id', quoteController.getQuote);
+router.put('/:id', authorize('admin', 'agent'), quoteController.updateQuote);
 router.patch('/:id/status', validate(updateQuoteStatusSchema), quoteController.updateStatus);
 
-// Admin routes
-router.get('/all/quotes', authorize('admin'), quoteController.listAllQuotes);
-router.post('/:id/approve', authorize('admin'), quoteController.approveQuote);
-router.post('/:id/reject', authorize('admin'), quoteController.rejectQuote);
+// Admin & Agent routes
+router.get('/all/quotes', authorize('admin', 'agent'), quoteController.listAllQuotes);
+router.post('/:id/approve', authorize('admin', 'agent'), quoteController.approveQuote);
+router.post('/:id/reject', authorize('admin', 'agent'), quoteController.rejectQuote);
 
 module.exports = router;

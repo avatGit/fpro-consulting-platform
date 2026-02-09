@@ -52,6 +52,13 @@ class InterventionService {
         }
         return intervention.report;
     }
+
+    async getTechnicianInterventions(userId) {
+        const technician = await technicianRepository.findByUserId(userId);
+        if (!technician) throw new Error('Technicien non trouvé');
+
+        return await interventionRepository.findByTechnician(technician.id);
+    }
 }
 
 module.exports = new InterventionService();

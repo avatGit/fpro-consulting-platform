@@ -235,11 +235,81 @@ function DashboardPage() {
             totalTTC: quote.total_amount,
             status: quote.status,
             products: quote.items ? quote.items.map(item => ({
-                name: item.product ? item.product.name : 'Produit',
+                name: item.product ? item.product.name : 'Produit inconnu',
                 quantity: item.quantity,
                 unitPrice: item.unit_price,
                 total: item.subtotal
             })) : []
+        };
+    };
+
+    const mapBackendOrderToSuiviState = (order) => {
+        if (!order) return null;
+
+        // Generate Timeline based on status
+        let timeline = [
+            { label: 'Validation', status: 'pending' },
+            { label: 'Préparation', status: 'pending' },
+            { label: 'Expédition', status: 'pending' },
+            { label: 'Livraison', status: 'pending' }
+        ];
+
+        const s = order.status;
+        if (['validated', 'processing', 'shipped', 'delivered', 'done'].includes(s)) {
+            timeline[0].status = 'completed';
+            timeline[1].status = 'current';
+        }
+        if (['processing', 'shipped', 'delivered', 'done'].includes(s)) {
+            timeline[1].status = 'completed';
+            timeline[2].status = 'current';
+        }
+        if (['shipped', 'delivered', 'done'].includes(s)) {
+            timeline[2].status = 'completed';
+            timeline[3].status = 'current';
+        }
+        if (['delivered', 'done'].includes(s)) {
+            timeline[3].status = 'completed';
+        }
+        if (s === 'pending') {
+            timeline[0].status = 'current';
+        }
+
+        // Map Status Label for CSS classes
+        let statusValue = 'en-attente';
+        let statusText = 'En attente';
+
+        if (['validated', 'processing', 'shipped'].includes(s)) {
+            statusValue = 'en-cours';
+            statusText = 'En cours';
+        } else if (['delivered', 'done'].includes(s)) {
+            statusValue = 'termine';
+            statusText = 'Terminé / Validée';
+        } else if (s === 'cancelled' || s === 'refused') {
+            statusValue = 'annule';
+            statusText = 'Annulé';
+        }
+
+        const rawDate = order.createdAt || order.created_at || new Date();
+        let itemsSummary = 'Détails non disponibles';
+        if (order.items && order.items.length > 0) {
+            itemsSummary = order.items.map(i => {
+                const pName = i.product ? i.product.name : (i.product_name || 'Produit inconnu');
+                return `${i.quantity}x ${pName}`;
+            }).join(', ');
+        }
+
+        return {
+            id: order.id,
+            type: 'Commande',
+            ref: order.order_number,
+            status: statusText,
+            statusClass: statusValue,
+            date: new Date(rawDate).toLocaleDateString('fr-FR'),
+            sortDate: new Date(rawDate),
+            items: itemsSummary,
+            agent: 'Admin',
+            timeline: timeline,
+            totalAmount: order.total_amount
         };
     };
 
@@ -323,78 +393,8 @@ function DashboardPage() {
                     if (ordersRes.status === 'fulfilled') {
                         console.log("Orders received:", ordersRes.value.data);
                         const rawOrders = ordersRes.value.data.data || [];
-                        fetchedOrders = rawOrders.map(order => {
-                            // Generate Timeline based on status
-                            let timeline = [
-                                { label: 'Validation', status: 'pending' },
-                                { label: 'Préparation', status: 'pending' },
-                                { label: 'Expédition', status: 'pending' },
-                                { label: 'Livraison', status: 'pending' }
-                            ]
-
-                            const s = order.status
-                            if (['validated', 'processing', 'shipped', 'delivered', 'done'].includes(s)) {
-                                timeline[0].status = 'completed'
-                                timeline[1].status = 'current'
-                            }
-                            if (['processing', 'shipped', 'delivered', 'done'].includes(s)) {
-                                timeline[1].status = 'completed'
-                                timeline[2].status = 'current'
-                            }
-                            if (['shipped', 'delivered', 'done'].includes(s)) {
-                                timeline[2].status = 'completed'
-                                timeline[3].status = 'current'
-                            }
-                            if (['delivered', 'done'].includes(s)) {
-                                timeline[3].status = 'completed'
-                            }
-                            if (s === 'pending') {
-                                timeline[0].status = 'current'
-                            }
-
-                            // Map Status Label for CSS classes
-                            let statusValue = 'en-attente'
-                            let statusText = 'En attente'
-
-                            if (['validated', 'processing'].includes(s)) {
-                                statusValue = 'en-cours'
-                                statusText = 'En cours'
-                            } else if (['shipped'].includes(s)) {
-                                statusValue = 'en-cours'
-                                statusText = 'Expédié'
-                            } else if (['delivered', 'done'].includes(s)) {
-                                statusValue = 'termine'
-                                statusText = 'Terminé'
-                            } else if (s === 'cancelled') {
-                                statusValue = 'annule'
-                                statusText = 'Annulé'
-                            }
-
-                            // Generate Items String - Defensive check for createdAt vs created_at
-                            const rawDate = order.createdAt || order.created_at || new Date();
-
-                            let itemsSummary = 'Détails non disponibles'
-                            if (order.items && order.items.length > 0) {
-                                itemsSummary = order.items.map(i => {
-                                    const pName = i.product ? i.product.name : 'Produit inconnu'
-                                    return `${i.quantity}x ${pName}`
-                                }).join(', ')
-                            }
-
-                            return {
-                                id: order.id,
-                                type: 'Commande',
-                                ref: order.order_number,
-                                status: statusText,
-                                statusClass: statusValue,
-                                date: new Date(rawDate).toLocaleDateString('fr-FR'),
-                                sortDate: new Date(rawDate),
-                                items: itemsSummary,
-                                agent: 'Admin',
-                                timeline: timeline,
-                                totalAmount: order.total_amount
-                            }
-                        });
+                        fetchedOrders = rawOrders.map(mapBackendOrderToSuiviState);
+                        setOrders(fetchedOrders);
                     } else {
                         console.error("Failed to fetch orders:", ordersRes.reason);
                     }
@@ -504,27 +504,30 @@ function DashboardPage() {
         }
     }
 
-    const handleGenerateQuoteFromCart = async () => {
+    const handlePasserCommande = async () => {
         if (cart.length === 0) return;
 
         try {
-            const response = await api.post('/quotes/generate', { companyId: user.company_id });
-            const quote = response.data.data;
-            alert('✓ Devis généré avec succès ! Vous pouvez maintenant le télécharger.');
+            const response = await api.post('/orders/from-cart', { companyId: user.company_id });
+            const rawOrder = response.data.data;
+            const mappedOrder = mapBackendOrderToSuiviState(rawOrder);
 
-            // Map backend quote to UI state
-            const mappedDevis = mapBackendQuoteToDevisState(quote);
-            setCurrentDevis(mappedDevis);
+            alert('✓ Votre commande a été validée avec succès ! Consultez la section Suivi.');
 
-            // Refresh list of quotes
-            const quotesRes = await api.get('/quotes');
-            setQuotes(quotesRes.data.data);
-
+            // Clear cart
             setCart([]);
-            setActiveMenu('devis');
+
+            // Refresh orders for Suivi
+            setActiveMenu('suivi');
+            setSelectedOrder(mappedOrder);
+
+            // Re-fetch orders to update the list on the left
+            const ordersRes = await api.get('/orders');
+            const rawOrders = ordersRes.data.data || [];
+            setOrders(rawOrders.map(mapBackendOrderToSuiviState));
         } catch (error) {
             console.error(error);
-            alert("Erreur lors de la génération du devis. Assurez-vous d'avoir des articles dans le panier.");
+            alert("Erreur lors de la validation de la commande. Assurez-vous d'avoir des articles dans le panier.");
         }
     }
 
@@ -579,36 +582,7 @@ function DashboardPage() {
         }
     }
 
-    const handlePasserCommande = () => {
-        if (!currentDevis) {
-            alert('Veuillez d\'abord générer un devis.')
-            return
-        }
 
-        // Create new order from current devis
-        const newOrder = {
-            id: Date.now(),
-            ref: `CMD-${Math.floor(1000 + Math.random() * 9000)}`,
-            status: 'En attente',
-            date: new Date().toLocaleDateString('fr-FR'),
-            items: `Devis ${currentDevis.quote_number} - ${currentDevis.total_amount} FCFA`,
-            agent: 'Karim Diallo',
-            timeline: [
-                { label: 'Demande recue', status: 'completed' },
-                { label: 'En cours', status: 'pending' },
-                { label: 'Intervention Prevue', status: 'pending' }
-            ],
-            devisRef: currentDevis.ref,
-            client: currentDevis.client,
-            totalTTC: currentDevis.totalTTC
-        }
-
-        setOrders([newOrder, ...orders])
-        setCurrentDevis(null) // Clear current devis
-        setActiveMenu('suivi')
-        setSelectedOrder(newOrder)
-        alert('✓ Votre commande a été validée avec succès ! Consultez la section Suivi.')
-    }
 
     const [maintenanceForm, setMaintenanceForm] = useState({
         description: '',
@@ -972,9 +946,9 @@ function DashboardPage() {
                                     <button
                                         className="btn-confirm-order"
                                         disabled={cart.length === 0}
-                                        onClick={handleGenerateQuoteFromCart}
+                                        onClick={handlePasserCommande}
                                     >
-                                        Générer le devis
+                                        Passer Commande
                                     </button>
                                 </div>
                             </div>
@@ -1035,11 +1009,11 @@ function DashboardPage() {
                                             </div>
 
                                             <div className="tracking-timeline">
-                                                {selectedOrder.timeline.map((step, index) => (
+                                                {selectedOrder.timeline?.map((step, index) => (
                                                     <div key={index} className={`timeline-step ${step.status}`}>
                                                         <div className="step-indicator">
                                                             <div className="step-dot"></div>
-                                                            {index < selectedOrder.timeline.length - 1 && <div className="step-line"></div>}
+                                                            {index < (selectedOrder.timeline?.length || 0) - 1 && <div className="step-line"></div>}
                                                         </div>
                                                         <span className="step-label">{step.label}</span>
                                                     </div>

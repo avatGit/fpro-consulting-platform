@@ -30,8 +30,8 @@ const Quote = sequelize.define('Quote', {
         }
     },
     status: {
-        type: DataTypes.ENUM('draft', 'sent', 'accepted', 'refused', 'expired'),
-        defaultValue: 'draft'
+        type: DataTypes.ENUM('draft', 'pending', 'sent', 'accepted', 'refused', 'expired'),
+        defaultValue: 'pending'
     },
     valid_until: {
         type: DataTypes.DATE,

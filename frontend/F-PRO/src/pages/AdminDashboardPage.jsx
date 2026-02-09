@@ -15,9 +15,13 @@ import {
     LoadingSpinner,
     EmptyState
 } from '../components/admin/AdminComponents';
+import Toast, { ToastContainer } from '../components/admin/Toast';
+import ConfirmationModal from '../components/admin/ConfirmationModal';
 import './AdminReset.css';
 import './AdminDashboardNew.css';
 import '../components/admin/AdminComponents.css';
+import '../components/admin/Toast.css';
+import '../components/admin/ConfirmationModal.css';
 
 function AdminDashboardPage() {
     const navigate = useNavigate();
@@ -58,6 +62,7 @@ function AdminDashboardPage() {
     // Orders State
     const [orders, setOrders] = useState([]);
     const [orderFilter, setOrderFilter] = useState({ status: '', search: '' });
+    const [quoteTab, setQuoteTab] = useState('devis'); // 'devis' or 'commandes'
 
     // Products State
     const [products, setProducts] = useState([]);
@@ -72,7 +77,51 @@ function AdminDashboardPage() {
     const [showQuoteModal, setShowQuoteModal] = useState(false);
     const [showInvoiceModal, setShowInvoiceModal] = useState(false);
     const [showSettingModal, setShowSettingModal] = useState(false);
+    const [showOrderModal, setShowOrderModal] = useState(false);
+    const [showMaintenanceModal, setShowMaintenanceModal] = useState(false);
+    const [showProductModal, setShowProductModal] = useState(false);
+    const [showQuoteEditModal, setShowQuoteEditModal] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
+    const [editingProduct, setEditingProduct] = useState(null);
+    const [selectedOrder, setSelectedOrder] = useState(null);
+    const [selectedMaintenance, setSelectedMaintenance] = useState(null);
+
+    // Notifications & Confirmations
+    const [toasts, setToasts] = useState([]);
+    const [confirmModal, setConfirmModal] = useState({
+        isOpen: false,
+        title: '',
+        message: '',
+        confirmText: '',
+        type: 'info',
+        onConfirm: () => { },
+        requireInput: false,
+        inputLabel: '',
+        inputPlaceholder: ''
+    });
+
+    const addToast = (message, type = 'info') => {
+        const id = Date.now();
+        setToasts(prev => [...prev, { id, message, type }]);
+    };
+
+    const removeToast = (id) => {
+        setToasts(prev => prev.filter(toast => toast.id !== id));
+    };
+
+    const showConfirm = (options) => {
+        setConfirmModal({
+            isOpen: true,
+            title: options.title || 'Confirmation',
+            message: options.message || 'Êtes-vous sûr ?',
+            confirmText: options.confirmText || 'Confirmer',
+            type: options.type || 'info',
+            onConfirm: options.onConfirm,
+            requireInput: options.requireInput || false,
+            inputLabel: options.inputLabel || '',
+            inputPlaceholder: options.inputPlaceholder || ''
+        });
+    };
 
     useEffect(() => {
         const userData = JSON.parse(localStorage.getItem('user'));
@@ -91,7 +140,7 @@ function AdminDashboardPage() {
                     await loadUsers();
                     break;
                 case 'quotes':
-                    await loadQuotes();
+                    await Promise.all([loadQuotes(), loadOrders()]);
                     break;
                 case 'invoices':
                     await loadInvoices();
@@ -109,7 +158,7 @@ function AdminDashboardPage() {
                     await loadProducts();
                     break;
                 case 'maintenance':
-                    await loadMaintenance();
+                    await Promise.all([loadMaintenance(), loadUsers()]);
                     break;
                 default:
                     break;
@@ -206,45 +255,73 @@ function AdminDashboardPage() {
     };
 
     const handleApproveQuote = async (quoteId) => {
-        alert(`DEBUG: handleApproveQuote called with ID: ${quoteId}`);
-        try {
-            await adminApi.approveQuote(quoteId);
-            await loadQuotes();
-            alert('Devis approuvé');
-        } catch (error) {
-            alert('Erreur lors de l\'approbation');
-        }
+        showConfirm({
+            title: 'Approuver le devis',
+            message: 'Êtes-vous sûr de vouloir approuver ce devis ? Une commande sera générée automatiquement.',
+            confirmText: 'Approuver',
+            type: 'info',
+            onConfirm: async () => {
+                try {
+                    await adminApi.approveQuote(quoteId);
+                    await Promise.all([loadQuotes(), loadOrders()]);
+                    addToast('Devis approuvé et commande générée avec succès !', 'success');
+                } catch (error) {
+                    console.error('Error approving quote:', error);
+                    addToast(error.response?.data?.message || 'Erreur lors de l\'approbation du devis', 'error');
+                }
+            }
+        });
     };
 
     const handleRejectQuote = async (quoteId) => {
-        const reason = prompt('Raison du rejet:');
-        if (!reason) return;
-        try {
-            await adminApi.rejectQuote(quoteId, reason);
-            await loadQuotes();
-            alert('Devis rejeté');
-        } catch (error) {
-            alert('Erreur lors du rejet');
-        }
+        showConfirm({
+            title: 'Rejeter le devis',
+            message: 'Veuillez indiquer la raison du rejet de ce devis.',
+            confirmText: 'Rejeter',
+            type: 'danger',
+            requireInput: true,
+            inputLabel: 'Motif du rejet',
+            inputPlaceholder: 'Ex: Prix trop élevé, informations manquantes...',
+            onConfirm: async (reason) => {
+                try {
+                    await adminApi.rejectQuote(quoteId, reason);
+                    await loadQuotes();
+                    addToast('Devis rejeté', 'warning');
+                } catch (error) {
+                    console.error('Error rejecting quote:', error);
+                    addToast(error.response?.data?.message || 'Erreur lors du rejet du devis', 'error');
+                }
+            }
+        });
     };
 
     const handleCreateInvoice = async (orderId) => {
-        try {
-            await adminApi.createInvoice(orderId);
-            await loadInvoices();
-            alert('Facture créée avec succès');
-        } catch (error) {
-            alert('Erreur lors de la création de la facture');
-        }
+        showConfirm({
+            title: 'Créer une facture',
+            message: 'Voulez-vous générer une facture pour cette commande ?',
+            confirmText: 'Générer',
+            type: 'info',
+            onConfirm: async () => {
+                try {
+                    await adminApi.createInvoice(orderId);
+                    await loadInvoices();
+                    addToast('Facture générée avec succès', 'success');
+                } catch (error) {
+                    console.error('Error creating invoice:', error);
+                    addToast(error.response?.data?.message || 'Erreur lors de la création de la facture', 'error');
+                }
+            }
+        });
     };
 
     const handleUpdateInvoiceStatus = async (invoiceId, status) => {
         try {
             await adminApi.updateInvoiceStatus(invoiceId, status);
             await loadInvoices();
-            alert('Statut mis à jour');
+            addToast(`Statut de la facture mis à jour : ${status}`, 'success');
         } catch (error) {
-            alert('Erreur lors de la mise à jour');
+            console.error('Error updating invoice status:', error);
+            addToast('Erreur lors de la mise à jour', 'error');
         }
     };
 
@@ -252,57 +329,686 @@ function AdminDashboardPage() {
         try {
             await adminApi.toggleUserStatus(userId);
             await loadUsers();
+            addToast('Statut utilisateur mis à jour', 'success');
         } catch (error) {
-            alert('Erreur lors du changement de statut');
+            console.error('Error toggling user status:', error);
+            addToast('Erreur lors du changement de statut', 'error');
         }
     };
 
     const handleValidateOrder = async (orderId) => {
-        console.log('Attempting to validate order:', orderId);
-        try {
-            // Confirm action
-            if (!window.confirm('Valider cette commande ? Cela déduira les produits du stock.')) return;
-            await adminApi.validateOrder(orderId);
-            console.log('Order validated successfully');
-            await loadOrders();
-            await loadDashboardStats(); // Update stats too
-            alert('Commande validée avec succès');
-        } catch (error) {
-            console.error('Validation error:', error);
-            alert('Erreur lors de la validation: ' + (error.response?.data?.message || 'Erreur inconnue'));
-        }
+        showConfirm({
+            title: 'Valider la commande',
+            message: 'Confirmez-vous la validation de cette commande ? Cela déduira les produits du stock.',
+            confirmText: 'Valider la commande',
+            type: 'warning',
+            onConfirm: async () => {
+                try {
+                    await adminApi.validateOrder(orderId);
+                    await loadOrders();
+                    await loadDashboard();
+                    addToast('Commande validée avec succès', 'success');
+                } catch (error) {
+                    console.error('Validation error:', error);
+                    addToast(error.response?.data?.message || 'Erreur lors de la validation', 'error');
+                }
+            }
+        });
     };
 
     const handleUpdateOrderStatus = async (orderId, status) => {
-        console.log('Attempting to update status:', orderId, status);
         try {
             await adminApi.updateOrderStatus(orderId, status);
-            console.log('Status updated successfully');
             await loadOrders();
-            await loadDashboardStats();
+            await loadDashboard();
+            addToast('Statut mis à jour avec succès', 'success');
         } catch (error) {
             console.error('Status update error:', error);
-            alert('Erreur lors de la mise à jour du statut');
+            addToast('Erreur lors de la mise à jour du statut', 'error');
         }
     };
 
     const handleAutoAssignTechnician = async (requestId) => {
-        console.log('Attempting to auto-assign technician for request:', requestId);
+        showConfirm({
+            title: 'Assignation automatique',
+            message: 'Voulez-vous assigner automatiquement le technicien le moins chargé à cette demande ?',
+            confirmText: 'Assigner auto',
+            type: 'info',
+            onConfirm: async () => {
+                try {
+                    await adminApi.autoAssignTechnician(requestId);
+                    await loadMaintenance();
+                    addToast('Technicien assigné automatiquement', 'success');
+                } catch (error) {
+                    console.error('Auto-assign error:', error);
+                }
+            }
+        });
+    };
+
+    const handleUpdateMaintenanceStatus = async (requestId, status) => {
         try {
-            await adminApi.autoAssignTechnician(requestId);
-            console.log('Technician assigned successfully');
+            await adminApi.updateMaintenanceStatus(requestId, status);
             await loadMaintenance();
-            await loadDashboardStats();
-            alert('Technicien assigné automatiquement');
+            addToast(`Statut de l'intervention mis à jour : ${status}`, 'success');
         } catch (error) {
-            console.error('Auto-assign error:', error);
-            alert('Erreur: ' + (error.response?.data?.message || 'Aucun technicien disponible'));
+            console.error('Error updating maintenance status:', error);
+            addToast('Erreur lors de la mise à jour', 'error');
         }
     };
 
+    const handleAssignTechnician = async (requestId, technicianId) => {
+        try {
+            await adminApi.assignTechnician(requestId, technicianId);
+            await loadMaintenance();
+            addToast('Technicien assigné avec succès', 'success');
+        } catch (error) {
+            console.error('Error assigning technician:', error);
+            addToast('Erreur lors de l\'assignation', 'error');
+        }
+    };
+
+    const handleCreateProduct = async (productData) => {
+        try {
+            await adminApi.createProduct(productData);
+            await loadProducts();
+            setShowProductModal(false);
+            addToast('Produit créé avec succès', 'success');
+        } catch (error) {
+            console.error('Error creating product:', error);
+            addToast('Erreur lors de la création du produit', 'error');
+        }
+    };
+
+    const handleEditProduct = async (productId, productData) => {
+        try {
+            await adminApi.updateProduct(productId, productData);
+            await loadProducts();
+            setShowProductModal(false);
+            addToast('Produit mis à jour avec succès', 'success');
+        } catch (error) {
+            console.error('Error updating product:', error);
+            addToast('Erreur lors de la mise à jour du produit', 'error');
+        }
+    };
+
+    const handleDeleteProduct = async (productId) => {
+        showConfirm({
+            title: 'Supprimer le produit',
+            message: 'Êtes-vous sûr de vouloir supprimer ce produit ? Cette action est irréversible.',
+            confirmText: 'Supprimer',
+            type: 'danger',
+            onConfirm: async () => {
+                try {
+                    await adminApi.deleteProduct(productId);
+                    await loadProducts();
+                    addToast('Produit supprimé', 'success');
+                } catch (error) {
+                    console.error('Error deleting product:', error);
+                    addToast('Erreur lors de la suppression', 'error');
+                }
+            }
+        });
+    };
+
     const handleLogout = () => {
-        localStorage.clear();
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
         navigate('/login');
+    };
+
+    // Helper to render Quote Details in Modal
+    const renderQuoteDetails = () => {
+        if (!selectedQuote) return null;
+
+        return (
+            <div className="detail-view">
+                <div className="detail-header">
+                    <div className="detail-id">
+                        <span className="label">Numéro de devis</span>
+                        <h3>{selectedQuote.quote_number}</h3>
+                    </div>
+                    <Badge text={selectedQuote.status} variant={getStatusVariant(selectedQuote.status)} />
+                </div>
+
+                <div className="detail-grid">
+                    <div className="detail-card">
+                        <h4>Informations Client</h4>
+                        <div className="info-group">
+                            <i className="fa-solid fa-user"></i>
+                            <div>
+                                <p className="info-label">Nom complet</p>
+                                <p className="info-value">{selectedQuote.user?.first_name} {selectedQuote.user?.last_name}</p>
+                            </div>
+                        </div>
+                        <div className="info-group">
+                            <i className="fa-solid fa-envelope"></i>
+                            <div>
+                                <p className="info-label">Email</p>
+                                <p className="info-value">{selectedQuote.user?.email}</p>
+                            </div>
+                        </div>
+                        {selectedQuote.company && (
+                            <div className="info-group">
+                                <i className="fa-solid fa-building"></i>
+                                <div>
+                                    <p className="info-label">Entreprise</p>
+                                    <p className="info-value">{selectedQuote.company.name}</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="detail-card">
+                        <h4>Récapitulatif</h4>
+                        <div className="info-group">
+                            <i className="fa-solid fa-calendar-alt"></i>
+                            <div>
+                                <p className="info-label">Date de création</p>
+                                <p className="info-value">{new Date(selectedQuote.createdAt || selectedQuote.created_at).toLocaleString()}</p>
+                            </div>
+                        </div>
+                        <div className="info-group">
+                            <i className="fa-solid fa-money-bill-wave"></i>
+                            <div>
+                                <p className="info-label">Montant Total</p>
+                                <p className="info-value" style={{ fontSize: '18px', fontWeight: '800', color: '#11047A' }}>
+                                    {parseFloat(selectedQuote.total_amount || 0).toLocaleString()} FCFA
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="items-section">
+                    <h4>Articles du devis</h4>
+                    <table className="detail-table">
+                        <thead>
+                            <tr>
+                                <th>Produit/Service</th>
+                                <th>Quantité</th>
+                                <th>Prix Unitaire</th>
+                                <th>Soustotal</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {selectedQuote.items?.map((item, idx) => (
+                                <tr key={idx}>
+                                    <td>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                            <i className={item.product?.type === 'service' ? 'fa-solid fa-concierge-bell' : 'fa-solid fa-box'} style={{ color: '#4318FF' }}></i>
+                                            {item.product?.name || 'Produit inconnu'}
+                                        </div>
+                                    </td>
+                                    <td>{item.quantity}</td>
+                                    <td>{parseFloat(item.unit_price || 0).toLocaleString()} FCFA</td>
+                                    <td>{parseFloat(item.total_price || 0).toLocaleString()} FCFA</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="detail-actions">
+                    {selectedQuote.status === 'pending' && (
+                        <>
+                            <button className="btn btn-danger" onClick={() => {
+                                setShowQuoteModal(false);
+                                handleRejectQuote(selectedQuote.id);
+                            }}>
+                                <i className="fa-solid fa-times"></i> Refuser
+                            </button>
+                            <button className="btn btn-success" onClick={() => {
+                                setShowQuoteModal(false);
+                                handleApproveQuote(selectedQuote.id);
+                            }}>
+                                <i className="fa-solid fa-check"></i> Confirmer
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    // Helper to render Order Details in Modal
+    const renderOrderDetails = () => {
+        if (!selectedOrder) return null;
+
+        return (
+            <div className="detail-view">
+                <div className="detail-header">
+                    <div className="detail-id">
+                        <span className="label">Numéro de commande</span>
+                        <h3>{selectedOrder.order_number}</h3>
+                    </div>
+                    <Badge text={selectedOrder.status} variant={getStatusVariant(selectedOrder.status)} />
+                </div>
+
+                <div className="detail-grid">
+                    <div className="detail-card">
+                        <h4>Client</h4>
+                        <p><strong>{selectedOrder.user?.first_name} {selectedOrder.user?.last_name}</strong></p>
+                        <p>{selectedOrder.user?.email}</p>
+                    </div>
+                    <div className="detail-card">
+                        <h4>Récapitulatif</h4>
+                        <p>Date: {new Date(selectedOrder.createdAt || selectedOrder.created_at).toLocaleString()}</p>
+                        <p>Total: {parseFloat(selectedOrder.total_amount || 0).toLocaleString()} FCFA</p>
+                    </div>
+                </div>
+
+                <div className="items-section">
+                    <h4>Articles</h4>
+                    <table className="detail-table">
+                        <thead>
+                            <tr>
+                                <th>Produit</th>
+                                <th>Quantité</th>
+                                <th>Prix</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {selectedOrder.items?.map((item, idx) => (
+                                <tr key={idx}>
+                                    <td>{item.product?.name || 'Produit'}</td>
+                                    <td>{item.quantity}</td>
+                                    <td>{parseFloat(item.unit_price || 0).toLocaleString()} FCFA</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div className="detail-actions">
+                    {selectedOrder.status === 'pending' && (
+                        <button className="btn btn-primary" onClick={() => {
+                            setShowOrderModal(false);
+                            handleValidateOrder(selectedOrder.id);
+                        }}>
+                            <i className="fa-solid fa-check-double"></i> Valider
+                        </button>
+                    )}
+                    {(selectedOrder.status === 'validated' || selectedOrder.status === 'processing' || selectedOrder.status === 'shipped') && (
+                        <button className="btn btn-success" onClick={() => {
+                            setShowOrderModal(false);
+                            handleUpdateOrderStatus(selectedOrder.id, 'delivered');
+                        }}>
+                            <i className="fa-solid fa-clipboard-check"></i> Terminer la commande
+                        </button>
+                    )}
+                    {(selectedOrder.status === 'delivered') && (
+                        <button className="btn btn-info" onClick={() => {
+                            setShowOrderModal(false);
+                            handleCreateInvoice(selectedOrder.id);
+                        }}>
+                            <i className="fa-solid fa-file-invoice"></i> Générer Facture
+                        </button>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    const renderInvoiceDetails = () => {
+        if (!selectedInvoice) return null;
+
+        return (
+            <div className="detail-view">
+                <div className="detail-header">
+                    <div className="detail-id">
+                        <span className="label">Numéro de facture</span>
+                        <h3>{selectedInvoice.invoice_number}</h3>
+                    </div>
+                    <Badge text={selectedInvoice.status} variant={getStatusVariant(selectedInvoice.status)} />
+                </div>
+
+                <div className="detail-grid">
+                    <div className="detail-card">
+                        <h4>Client / Entreprise</h4>
+                        <p><strong>{selectedInvoice.company?.name || 'N/A'}</strong></p>
+                        <p>{selectedInvoice.company?.address}</p>
+                    </div>
+                    <div className="detail-card">
+                        <h4>Récapitulatif</h4>
+                        <p>Date d'émission: {new Date(selectedInvoice.issue_date).toLocaleDateString()}</p>
+                        <p>Date d'échéance: {selectedInvoice.due_date ? new Date(selectedInvoice.due_date).toLocaleDateString() : 'N/A'}</p>
+                        <p style={{ fontSize: '18px', fontWeight: '800', color: '#11047A', marginTop: '10px' }}>
+                            Total: {parseFloat(selectedInvoice.total_amount || 0).toLocaleString()} FCFA
+                        </p>
+                    </div>
+                </div>
+
+                <div className="detail-actions">
+                    {selectedInvoice.status !== 'paid' && (
+                        <button className="btn btn-success" onClick={() => {
+                            setShowInvoiceModal(false);
+                            handleUpdateInvoiceStatus(selectedInvoice.id, 'paid');
+                        }}>
+                            <i className="fa-solid fa-check-circle"></i> Marquer comme payée
+                        </button>
+                    )}
+                    <button className="btn btn-secondary" onClick={() => window.print()}>
+                        <i className="fa-solid fa-print"></i> Imprimer
+                    </button>
+                </div>
+            </div>
+        );
+    };
+
+    const renderMaintenanceDetails = () => {
+        if (!selectedMaintenance) return null;
+
+        return (
+            <div className="detail-view">
+                <div className="detail-header">
+                    <div className="detail-id">
+                        <span className="label">Intervention ID</span>
+                        <h3>#{selectedMaintenance.id}</h3>
+                    </div>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                        <Badge text={selectedMaintenance.priority} variant={getPriorityVariant(selectedMaintenance.priority)} />
+                        <Badge text={selectedMaintenance.status} variant={getStatusVariant(selectedMaintenance.status)} />
+                    </div>
+                </div>
+
+                <div className="detail-grid">
+                    <div className="detail-card">
+                        <h4>Description du problème</h4>
+                        <p className="description-text">{selectedMaintenance.description}</p>
+                    </div>
+                    <div className="detail-card">
+                        <h4>Attribution</h4>
+                        <div className="info-group">
+                            <i className="fa-solid fa-user-tie"></i>
+                            <div>
+                                <p className="info-label">Technicien</p>
+                                <p className="info-value">{selectedMaintenance.technician ? `${selectedMaintenance.technician.first_name} ${selectedMaintenance.technician.last_name}` : 'Non assigné'}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="detail-actions">
+                    {selectedMaintenance.status === 'new' && (
+                        <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                            <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
+                                <label style={{ fontSize: '12px', color: '#A3AED0', marginBottom: '5px', display: 'block' }}>Assigner manuellement un technicien</label>
+                                <select
+                                    className="form-control"
+                                    onChange={(e) => {
+                                        const techId = e.target.value;
+                                        if (techId) {
+                                            showConfirm({
+                                                title: 'Assigner ce technicien ?',
+                                                message: 'Confirmez-vous l\'attribution de cette intervention ?',
+                                                onConfirm: () => handleAssignTechnician(selectedMaintenance.id, techId)
+                                            });
+                                        }
+                                    }}
+                                    defaultValue=""
+                                >
+                                    <option value="" disabled>Choisir un technicien...</option>
+                                    {users.filter(u => u.role === 'technicien').map(tech => (
+                                        <option key={tech.id} value={tech.id}>
+                                            {tech.first_name} {tech.last_name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <button className="btn btn-info" onClick={() => {
+                                setShowMaintenanceModal(false);
+                                handleAutoAssignTechnician(selectedMaintenance.id);
+                            }}>
+                                <i className="fa-solid fa-robot"></i> Assignation Auto
+                            </button>
+                        </div>
+                    )}
+                    {selectedMaintenance.status === 'assigned' && (
+                        <button className="btn btn-primary" onClick={() => {
+                            setShowMaintenanceModal(false);
+                            handleUpdateMaintenanceStatus(selectedMaintenance.id, 'in_progress');
+                        }}>
+                            <i className="fa-solid fa-play"></i> Démarrer l'intervention
+                        </button>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    // --- Components for Modals (to avoid hook violations) ---
+
+    const QuoteEditForm = ({ quote, onCancel, onSuccess, onToast, loadData }) => {
+        const [editItems, setEditItems] = useState(quote.items || []);
+
+        const updateQuantity = (idx, newQty) => {
+            const items = [...editItems];
+            items[idx].quantity = Math.max(1, parseInt(newQty) || 1);
+            items[idx].total_price = items[idx].quantity * items[idx].unit_price;
+            setEditItems(items);
+        };
+
+        const removeItem = (idx) => {
+            setEditItems(editItems.filter((_, i) => i !== idx));
+        };
+
+        const calculateSubtotal = () => editItems.reduce((acc, item) => acc + (parseFloat(item.total_price) || 0), 0);
+
+        const handleSubmit = async (e) => {
+            e.preventDefault();
+            const subtotal = calculateSubtotal();
+            const vatRate = 18;
+            const vatAmount = subtotal * (vatRate / 100);
+            const totalAmount = subtotal + vatAmount;
+
+            const data = {
+                items: editItems.map(item => ({
+                    product_id: item.product_id,
+                    quantity: item.quantity,
+                    unit_price: item.unit_price,
+                    subtotal: item.total_price
+                })),
+                subtotal,
+                vat_amount: vatAmount,
+                total_amount: totalAmount
+            };
+
+            try {
+                await adminApi.updateQuote(quote.id, data);
+                await loadData();
+                onSuccess();
+                onToast('Devis mis à jour avec succès', 'success');
+            } catch (error) {
+                console.error('Error updating quote:', error);
+                onToast('Erreur lors de la mise à jour du devis', 'error');
+            }
+        };
+
+        return (
+            <div className="quote-edit-form">
+                <form onSubmit={handleSubmit}>
+                    <div className="items-list" style={{ marginBottom: '20px' }}>
+                        <table className="detail-table">
+                            <thead>
+                                <tr>
+                                    <th>Produit</th>
+                                    <th>Prix Unitaire</th>
+                                    <th style={{ width: '100px' }}>Quantité</th>
+                                    <th>Total</th>
+                                    <th style={{ width: '50px' }}></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {editItems.map((item, idx) => (
+                                    <tr key={idx}>
+                                        <td>{item.product?.name}</td>
+                                        <td>{parseFloat(item.unit_price).toLocaleString()} FCFA</td>
+                                        <td>
+                                            <input
+                                                type="number"
+                                                value={item.quantity}
+                                                onChange={(e) => updateQuantity(idx, e.target.value)}
+                                                className="form-control"
+                                                style={{ padding: '5px' }}
+                                            />
+                                        </td>
+                                        <td>{parseFloat(item.total_price).toLocaleString()} FCFA</td>
+                                        <td>
+                                            <button type="button" className="btn-icon btn-danger" onClick={() => removeItem(idx)}>
+                                                <i className="fa-solid fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div className="quote-summary" style={{ background: '#F4F7FE', padding: '15px', borderRadius: '12px', marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                            <span>Sous-total:</span>
+                            <span style={{ fontWeight: '600' }}>{calculateSubtotal().toLocaleString()} FCFA</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '5px' }}>
+                            <span>TVA (18%):</span>
+                            <span>{(calculateSubtotal() * 0.18).toLocaleString()} FCFA</span>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: '800', color: '#11047A', marginTop: '10px', paddingTop: '10px', borderTop: '1px solid #E9EDF7' }}>
+                            <span>Total TTC:</span>
+                            <span>{(calculateSubtotal() * 1.18).toLocaleString()} FCFA</span>
+                        </div>
+                    </div>
+
+                    <div className="form-actions" style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                        <button type="button" className="btn btn-secondary" onClick={onCancel}>Annuler</button>
+                        <button type="submit" className="btn btn-primary" style={{ background: '#4318FF', color: 'white', padding: '10px 20px', borderRadius: '10px', fontWeight: '600' }}>
+                            Sauvegarder les modifications
+                        </button>
+                    </div>
+                </form>
+            </div>
+        );
+    };
+
+    const ProductForm = ({ product, onCancel, onSave }) => {
+        const isEditing = !!product;
+
+        const handleSubmit = (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            onSave(isEditing ? product.id : null, data);
+        };
+
+        return (
+            <div className="admin-form">
+                <form onSubmit={handleSubmit}>
+                    <div className="form-row" style={{ display: 'flex', gap: '20px' }}>
+                        <div className="form-group" style={{ flex: 1 }}>
+                            <label>Nom du produit</label>
+                            <input name="name" defaultValue={product?.name} required className="form-control" />
+                        </div>
+                        <div className="form-group" style={{ flex: 1 }}>
+                            <label>SKU</label>
+                            <input name="sku" defaultValue={product?.sku} required className="form-control" />
+                        </div>
+                    </div>
+
+                    <div className="form-row" style={{ display: 'flex', gap: '20px', marginTop: '15px' }}>
+                        <div className="form-group" style={{ flex: 1 }}>
+                            <label>Type</label>
+                            <select name="type" defaultValue={product?.type || 'product'} className="form-control" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #E9EDF7' }}>
+                                <option value="product">Produit physique</option>
+                                <option value="service">Service / Forfait</option>
+                            </select>
+                        </div>
+                        <div className="form-group" style={{ flex: 1 }}>
+                            <label>Prix de base (FCFA)</label>
+                            <input name="base_price" type="number" step="0.01" defaultValue={product?.base_price} required className="form-control" />
+                        </div>
+                    </div>
+
+                    <div className="form-group" style={{ marginTop: '15px' }}>
+                        <label>Description</label>
+                        <textarea name="description" defaultValue={product?.description} className="form-control" rows="3" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #E9EDF7' }}></textarea>
+                    </div>
+
+                    <div className="form-row" style={{ display: 'flex', gap: '20px', marginTop: '15px' }}>
+                        <div className="form-group" style={{ flex: 1 }}>
+                            <label>Quantité en stock</label>
+                            <input name="stock_quantity" type="number" defaultValue={product?.stock_quantity || 0} required className="form-control" />
+                        </div>
+                        <div className="form-group" style={{ flex: 1 }}>
+                            <label>Seuil d'alerte</label>
+                            <input name="min_threshold" type="number" defaultValue={product?.min_threshold || 5} required className="form-control" />
+                        </div>
+                    </div>
+
+                    <div className="form-actions" style={{ marginTop: '25px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                        <button type="button" className="btn btn-secondary" onClick={onCancel}>Annuler</button>
+                        <button type="submit" className="btn btn-primary" style={{ background: '#4318FF', color: 'white', padding: '10px 20px', borderRadius: '10px', fontWeight: '600' }}>
+                            {isEditing ? 'Mettre à jour' : 'Ajouter au catalogue'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        );
+    };
+
+    const UserForm = ({ user, onCancel, onSave }) => {
+        const isEditing = !!user;
+        return (
+            <div className="user-form-container">
+                <form className="admin-form" onSubmit={(e) => {
+                    e.preventDefault();
+                    const formData = new FormData(e.target);
+                    const userData = Object.fromEntries(formData.entries());
+                    onSave(isEditing ? user.id : null, userData);
+                }}>
+                    <div className="form-row" style={{ display: 'flex', gap: '15px' }}>
+                        <div className="form-group" style={{ flex: 1 }}>
+                            <label>Prénom</label>
+                            <input name="first_name" defaultValue={user?.first_name} required className="form-control" />
+                        </div>
+                        <div className="form-group" style={{ flex: 1 }}>
+                            <label>Nom</label>
+                            <input name="last_name" defaultValue={user?.last_name} required className="form-control" />
+                        </div>
+                    </div>
+
+                    <div className="form-group" style={{ marginTop: '15px' }}>
+                        <label>Email</label>
+                        <input name="email" type="email" defaultValue={user?.email} required className="form-control" />
+                    </div>
+
+                    {!isEditing && (
+                        <div className="form-group" style={{ marginTop: '15px' }}>
+                            <label>Mot de passe</label>
+                            <input name="password" type="password" required className="form-control" />
+                        </div>
+                    )}
+
+                    <div className="form-group" style={{ marginTop: '15px' }}>
+                        <label>Rôle</label>
+                        <select name="role" defaultValue={user?.role || 'client'} className="form-control" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #E9EDF7' }}>
+                            <option value="client">Client</option>
+                            <option value="admin">Administrateur</option>
+                            <option value="agent">Agent</option>
+                            <option value="technicien">Technicien</option>
+                        </select>
+                    </div>
+
+                    <div className="form-actions" style={{ marginTop: '25px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                        <button type="button" className="btn btn-secondary" onClick={onCancel}>Annuler</button>
+                        <button type="submit" className="btn btn-primary" style={{ background: '#4318FF', color: 'white', padding: '10px 20px', borderRadius: '10px', fontWeight: '600' }}>
+                            {isEditing ? 'Mettre à jour' : 'Créer l\'utilisateur'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        );
     };
 
     // Render Functions
@@ -313,7 +1019,7 @@ function AdminDashboardPage() {
             {/* 1. Top Stats Row - Exactly 4 cards as in design */}
             <div className="stats-grid">
                 <StatCard
-                    icon="fas fa-users"
+                    icon="fa-solid fa-users"
                     label="Active Users"
                     value={dashboardStats?.overview?.totalUsers ?? '-'}
                     trend="+12%"
@@ -321,7 +1027,7 @@ function AdminDashboardPage() {
                     color="primary"
                 />
                 <StatCard
-                    icon="fas fa-shopping-cart"
+                    icon="fa-solid fa-shopping-cart"
                     label="Commandes"
                     value={dashboardStats?.overview?.totalOrders ?? '-'}
                     trend="+5%"
@@ -329,7 +1035,7 @@ function AdminDashboardPage() {
                     color="info" // Blue
                 />
                 <StatCard
-                    icon="fas fa-euro-sign"
+                    icon="fa-solid fa-euro-sign"
                     label="Revenus du mois"
                     value={dashboardStats?.overview?.monthRevenue ? `${dashboardStats.overview.monthRevenue.toLocaleString()} €` : '0 €'}
                     trend="+8%"
@@ -337,7 +1043,7 @@ function AdminDashboardPage() {
                     color="success" // Green
                 />
                 <StatCard
-                    icon="fas fa-tools"
+                    icon="fa-solid fa-tools"
                     label="Maintenance"
                     value={dashboardStats?.overview?.activeMaintenance ?? '-'}
                     trend="-2"
@@ -356,13 +1062,13 @@ function AdminDashboardPage() {
                     <div className="dashboard-section card">
                         <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
                             <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#2B3674' }}>Urgences</h2>
-                            <button className="btn-icon"><i className="fas fa-ellipsis-h"></i></button>
+                            <button className="btn-icon"><i className="fa-solid fa-ellipsis-h"></i></button>
                         </div>
 
                         <div className="recent-orders-list">
                             {(!dashboardStats?.recentOrders || dashboardStats.recentOrders.length === 0) ? (
                                 <EmptyState
-                                    icon="fas fa-shopping-cart"
+                                    icon="fa-solid fa-shopping-cart"
                                     message="Aucune commande récente"
                                 />
                             ) : (
@@ -371,7 +1077,7 @@ function AdminDashboardPage() {
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                                             <div style={{ width: '6px', height: '6px', borderRadius: '50%', background: getStatusColor(order.status) }}></div>
                                             <span style={{ fontWeight: '600', color: '#2B3674' }}>{order.order_number}</span>
-                                            <span style={{ color: '#A3AED0', fontSize: '14px' }}>{new Date(order.created_at).toLocaleDateString()}</span>
+                                            <span style={{ color: '#A3AED0', fontSize: '14px' }}>{new Date(order.createdAt || order.created_at).toLocaleDateString()}</span>
                                         </div>
                                         <Badge text={order.status} variant={getStatusVariant(order.status)} />
                                     </div>
@@ -413,7 +1119,7 @@ function AdminDashboardPage() {
                     <div className="dashboard-section card" style={{ height: '100%' }}>
                         <div className="section-header" style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between' }}>
                             <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#2B3674' }}>Statistiques Globales</h2>
-                            <button className="btn-icon"><i className="fas fa-chart-bar"></i></button>
+                            <button className="btn-icon"><i className="fa-solid fa-chart-bar"></i></button>
                         </div>
                         <div className="chart-container" style={{ height: '200px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 10px' }}>
                             {/* CSS Bar Chart */}
@@ -466,7 +1172,7 @@ function AdminDashboardPage() {
                 render: (row) => (
                     <div className="action-buttons">
                         <ActionButton
-                            icon="fas fa-edit"
+                            icon="fa-solid fa-edit"
                             onClick={() => {
                                 setEditingUser(row);
                                 setShowUserModal(true);
@@ -475,7 +1181,7 @@ function AdminDashboardPage() {
                             variant="primary"
                         />
                         <ActionButton
-                            icon={row.is_active ? 'fas fa-ban' : 'fas fa-check'}
+                            icon={row.is_active ? 'fa-solid fa-ban' : 'fa-solid fa-check'}
                             onClick={() => handleToggleUserStatus(row.id)}
                             tooltip={row.is_active ? 'Désactiver' : 'Activer'}
                             variant={row.is_active ? 'warning' : 'success'}
@@ -499,7 +1205,7 @@ function AdminDashboardPage() {
                             setEditingUser(null);
                             setShowUserModal(true);
                         }}>
-                            <i className="fas fa-plus"></i> Nouvel Utilisateur
+                            <i className="fa-solid fa-plus"></i> Nouvel Utilisateur
                         </button>
                     </div>
 
@@ -540,10 +1246,10 @@ function AdminDashboardPage() {
                             <div className="bulk-actions" style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                                 <span style={{ fontWeight: '600' }}>{selectedUsers.length} sélectionné(s)</span>
                                 <button onClick={() => handleBulkUserAction('activate')} className="btn btn-success btn-sm">
-                                    <i className="fas fa-check"></i>
+                                    <i className="fa-solid fa-check"></i>
                                 </button>
                                 <button onClick={() => handleBulkUserAction('deactivate')} className="btn btn-danger btn-sm">
-                                    <i className="fas fa-ban"></i>
+                                    <i className="fa-solid fa-ban"></i>
                                 </button>
                             </div>
                         )}
@@ -585,90 +1291,232 @@ function AdminDashboardPage() {
                 label: 'Statut',
                 render: (row) => <Badge text={row.status} variant={getStatusVariant(row.status)} />
             },
-            { label: 'Date', render: (row) => new Date(row.created_at).toLocaleDateString() },
+            {
+                label: 'Date', render: (row) => {
+                    const dateVal = row.createdAt || row.created_at;
+                    if (!dateVal) return 'N/A';
+                    const date = new Date(dateVal);
+                    return isNaN(date.getTime()) ? 'Date invalide' : date.toLocaleDateString();
+                }
+            },
             {
                 label: 'Actions',
-                render: (row) => {
-                    console.log('Rendering actions for quote:', row.id, 'status:', row.status);
-                    return (
-                        <div className="action-buttons" style={{ display: 'flex', gap: '8px' }}>
-                            <ActionButton
-                                icon="fas fa-eye"
-                                onClick={() => setSelectedQuote(row)}
-                                tooltip="Voir détails"
-                                variant="primary"
-                            />
-                            {row.status === 'draft' && (
+                render: (row) => (
+                    <div className="action-buttons" style={{ display: 'flex', gap: '8px' }}>
+                        <ActionButton
+                            icon="fa-solid fa-eye"
+                            onClick={() => {
+                                setSelectedQuote(row);
+                                setShowQuoteModal(true);
+                            }}
+                            tooltip="Voir détails"
+                            variant="primary"
+                        />
+                        {(row.status === 'pending' || row.status === 'draft') && (
+                            <>
                                 <ActionButton
-                                    icon="fas fa-edit"
-                                    onClick={() => alert('Edit feature coming soon')}
-                                    tooltip="Modifier"
-                                    variant="warning"
+                                    icon="fa-solid fa-check"
+                                    onClick={() => handleApproveQuote(row.id)}
+                                    tooltip="Confirmer"
+                                    variant="success"
                                 />
-                            )}
-                            {row.status === 'pending' && (
-                                <>
-                                    <ActionButton
-                                        icon="fas fa-check"
-                                        onClick={() => handleApproveQuote(row.id)}
-                                        tooltip="Approuver"
-                                        variant="success"
-                                    />
-                                    <ActionButton
-                                        icon="fas fa-times"
-                                        onClick={() => handleRejectQuote(row.id)}
-                                        tooltip="Rejeter"
-                                        variant="danger"
-                                    />
-                                </>
-                            )}
-                        </div>
-                    );
-                }
+                                <ActionButton
+                                    icon="fa-solid fa-times"
+                                    onClick={() => handleRejectQuote(row.id)}
+                                    tooltip="Refuser"
+                                    variant="danger"
+                                />
+                            </>
+                        )}
+                    </div>
+                )
             }
         ];
 
         return (
             <div className="dashboard-container">
                 <div className="dashboard-section card">
-                    <div className="section-header">
-                        <div>
-                            <h2>Gestion des Devis</h2>
-                            <p style={{ color: '#A3AED0', fontSize: '14px', marginTop: '5px' }}>
-                                {filteredQuotes.length} devis trouvé(s)
-                            </p>
+                    <div className="section-header" style={{ borderBottom: '1px solid #E9EDF7', marginBottom: '20px', paddingBottom: '10px' }}>
+                        <div style={{ display: 'flex', gap: '30px' }}>
+                            <h2
+                                onClick={() => setQuoteTab('devis')}
+                                style={{
+                                    cursor: 'pointer',
+                                    color: quoteTab === 'devis' ? '#2B3674' : '#A3AED0',
+                                    borderBottom: quoteTab === 'devis' ? '3px solid #4318FF' : 'none',
+                                    paddingBottom: '10px',
+                                    transition: 'all 0.3s ease'
+                                }}
+                            >
+                                Gestion des Devis
+                            </h2>
+                            <h2
+                                onClick={() => setQuoteTab('commandes')}
+                                style={{
+                                    cursor: 'pointer',
+                                    color: quoteTab === 'commandes' ? '#2B3674' : '#A3AED0',
+                                    borderBottom: quoteTab === 'commandes' ? '3px solid #4318FF' : 'none',
+                                    paddingBottom: '10px',
+                                    transition: 'all 0.3s ease'
+                                }}
+                            >
+                                Gestion des Commandes
+                            </h2>
                         </div>
                     </div>
 
-                    <div className="module-toolbar" style={{ marginBottom: '20px', display: 'flex', gap: '20px' }}>
-                        <div style={{ flex: 1 }}>
-                            <SearchBar
-                                value={quoteFilter.search}
-                                onChange={(value) => setQuoteFilter({ ...quoteFilter, search: value })}
-                                placeholder="Rechercher par numéro..."
+                    {quoteTab === 'devis' ? (
+                        <>
+                            <div className="module-toolbar" style={{ marginBottom: '20px', display: 'flex', gap: '20px' }}>
+                                <div style={{ flex: 1 }}>
+                                    <SearchBar
+                                        value={quoteFilter.search}
+                                        onChange={(value) => setQuoteFilter({ ...quoteFilter, search: value })}
+                                        placeholder="Rechercher par numéro..."
+                                    />
+                                </div>
+                                <FilterDropdown
+                                    label="Statut"
+                                    options={[
+                                        { value: 'pending', label: 'En attente' },
+                                        { value: 'accepted', label: 'Accepté' },
+                                        { value: 'refused', label: 'Refusé' }
+                                    ]}
+                                    value={quoteFilter.status}
+                                    onChange={(value) => setQuoteFilter({ ...quoteFilter, status: value })}
+                                />
+                            </div>
+                            <DataTable
+                                columns={quoteColumns}
+                                data={filteredQuotes}
+                                loading={loading}
+                                emptyMessage="Aucun devis trouvé"
                             />
-                        </div>
+                        </>
+                    ) : (
+                        renderOrdersContent()
+                    )}
+                </div>
+            </div>
+        );
+    };
 
-                        <FilterDropdown
-                            label="Statut"
-                            options={[
-                                { value: 'pending', label: 'En attente' },
-                                { value: 'accepted', label: 'Accepté' },
-                                { value: 'refused', label: 'Refusé' }
-                            ]}
-                            value={quoteFilter.status}
-                            onChange={(value) => setQuoteFilter({ ...quoteFilter, status: value })}
+    // New helper to render only the orders content (without the full dashboard-container wrapper)
+    const renderOrdersContent = () => {
+        const filteredOrders = orders.filter(order => {
+            const matchesStatus = !orderFilter.status || order.status === orderFilter.status;
+            const matchesSearch = !orderFilter.search ||
+                order.order_number?.toLowerCase().includes(orderFilter.search.toLowerCase());
+            return matchesStatus && matchesSearch;
+        });
+
+        const orderColumns = [
+            { label: 'N° Commande', field: 'order_number' },
+            {
+                label: 'Client',
+                render: (row) => row.user ? `${row.user.first_name} ${row.user.last_name}` : 'N/A'
+            },
+            { label: 'Montant', render: (row) => `${parseFloat(row.total_amount || 0).toLocaleString()} FCFA` },
+            {
+                label: 'Statut',
+                render: (row) => <Badge text={row.status} variant={getStatusVariant(row.status)} />
+            },
+            { label: 'Date', render: (row) => new Date(row.createdAt || row.created_at).toLocaleDateString() },
+            {
+                label: 'Actions',
+                render: (row) => (
+                    <div className="action-buttons">
+                        {/* Validation & Progress */}
+                        {row.status === 'pending' && (
+                            <ActionButton
+                                icon="fa-solid fa-check-circle"
+                                onClick={() => handleValidateOrder(row.id)}
+                                tooltip="Valider (Mettre en cours)"
+                                variant="success"
+                            />
+                        )}
+
+                        {(row.status === 'validated' || row.status === 'processing') && (
+                            <ActionButton
+                                icon="fa-solid fa-clipboard-check"
+                                onClick={() => handleUpdateOrderStatus(row.id, 'delivered')}
+                                tooltip="Terminer la commande"
+                                variant="success"
+                            />
+                        )}
+
+                        {row.status === 'shipped' && (
+                            <ActionButton
+                                icon="fa-solid fa-clipboard-check"
+                                onClick={() => handleUpdateOrderStatus(row.id, 'delivered')}
+                                tooltip="Marquer comme terminé"
+                                variant="success"
+                            />
+                        )}
+
+                        {/* Invoice & Cancel */}
+                        {!row.invoice && row.status === 'delivered' && (
+                            <ActionButton
+                                icon="fa-solid fa-file-invoice"
+                                onClick={() => handleCreateInvoice(row.id)}
+                                tooltip="Créer facture"
+                                variant="success"
+                            />
+                        )}
+                        {row.status === 'pending' && (
+                            <ActionButton
+                                icon="fa-solid fa-times-circle"
+                                onClick={() => handleUpdateOrderStatus(row.id, 'cancelled')}
+                                tooltip="Annuler"
+                                variant="danger"
+                            />
+                        )}
+
+                        {/* View Details */}
+                        <ActionButton
+                            icon="fa-solid fa-eye"
+                            onClick={() => {
+                                setSelectedOrder(row);
+                                setShowOrderModal(true);
+                            }}
+                            tooltip="Voir détails"
+                            variant="primary"
+                        />
+                    </div>
+                )
+            }
+        ];
+
+        return (
+            <>
+                <div className="module-toolbar" style={{ marginBottom: '20px', display: 'flex', gap: '20px' }}>
+                    <div style={{ flex: 1 }}>
+                        <SearchBar
+                            value={orderFilter.search}
+                            onChange={(value) => setOrderFilter({ ...orderFilter, search: value })}
+                            placeholder="Rechercher par numéro..."
                         />
                     </div>
 
-                    <DataTable
-                        columns={quoteColumns}
-                        data={filteredQuotes}
-                        loading={loading}
-                        emptyMessage="Aucun devis trouvé"
+                    <FilterDropdown
+                        label="Statut"
+                        options={[
+                            { value: 'pending', label: 'En attente' },
+                            { value: 'processing', label: 'En cours' },
+                            { value: 'delivered', label: 'Terminée' }
+                        ]}
+                        value={orderFilter.status}
+                        onChange={(value) => setOrderFilter({ ...orderFilter, status: value })}
                     />
                 </div>
-            </div>
+
+                <DataTable
+                    columns={orderColumns}
+                    data={filteredOrders}
+                    loading={loading}
+                    emptyMessage="Aucune commande trouvée"
+                />
+            </>
         );
     };
 
@@ -699,15 +1547,18 @@ function AdminDashboardPage() {
                     <div className="action-buttons">
                         {row.status !== 'paid' && (
                             <ActionButton
-                                icon="fas fa-check-circle"
+                                icon="fa-solid fa-check-circle"
                                 onClick={() => handleUpdateInvoiceStatus(row.id, 'paid')}
                                 tooltip="Marquer comme payé"
                                 variant="success"
                             />
                         )}
                         <ActionButton
-                            icon="fas fa-eye"
-                            onClick={() => setSelectedInvoice(row)}
+                            icon="fa-solid fa-eye"
+                            onClick={() => {
+                                setSelectedInvoice(row);
+                                setShowInvoiceModal(true);
+                            }}
                             tooltip="Voir détails"
                             variant="primary"
                         />
@@ -721,25 +1572,25 @@ function AdminDashboardPage() {
                 {invoiceStats && (
                     <div className="stats-grid" style={{ marginBottom: '30px' }}>
                         <StatCard
-                            icon="fas fa-file-invoice-dollar"
+                            icon="fa-solid fa-file-invoice-dollar"
                             value={invoiceStats.totalInvoices || 0}
                             label="Total Factures"
                             color="primary"
                         />
                         <StatCard
-                            icon="fas fa-check-circle"
+                            icon="fa-solid fa-check-circle"
                             value={invoiceStats.paidInvoices || 0}
                             label="Factures Payées"
                             color="success"
                         />
                         <StatCard
-                            icon="fas fa-exclamation-triangle"
+                            icon="fa-solid fa-exclamation-triangle"
                             value={invoiceStats.overdueInvoices || 0}
                             label="Factures En Retard"
                             color="danger"
                         />
                         <StatCard
-                            icon="fas fa-dollar-sign"
+                            icon="fa-solid fa-dollar-sign"
                             value={`${(invoiceStats.totalRevenue || 0).toLocaleString()} FCFA`}
                             label="Revenu Total"
                             color="warning"
@@ -792,7 +1643,7 @@ function AdminDashboardPage() {
 
     const renderAuditLogs = () => {
         const auditColumns = [
-            { label: 'Date', render: (row) => new Date(row.created_at).toLocaleString() },
+            { label: 'Date', render: (row) => new Date(row.createdAt || row.created_at).toLocaleString() },
             {
                 label: 'Utilisateur',
                 render: (row) => row.user ? `${row.user.first_name} ${row.user.last_name}` : 'Système'
@@ -813,7 +1664,7 @@ function AdminDashboardPage() {
                                 Historique des actions administratives
                             </p>
                         </div>
-                        <button className="btn-icon"><i className="fas fa-download"></i></button>
+                        <button className="btn-icon"><i className="fa-solid fa-download"></i></button>
                     </div>
 
                     <div className="module-toolbar" style={{ marginBottom: '20px', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
@@ -893,7 +1744,7 @@ function AdminDashboardPage() {
                             </p>
                         </div>
                         <button className="btn btn-primary" onClick={() => adminApi.initDefaultSettings()}>
-                            <i className="fas fa-sync"></i> Initialiser Paramètres
+                            <i className="fa-solid fa-sync"></i> Initialiser Paramètres
                         </button>
                     </div>
 
@@ -955,43 +1806,35 @@ function AdminDashboardPage() {
                 label: 'Statut',
                 render: (row) => <Badge text={row.status} variant={getStatusVariant(row.status)} />
             },
-            { label: 'Date', render: (row) => new Date(row.created_at).toLocaleDateString() },
+            { label: 'Date', render: (row) => new Date(row.createdAt || row.created_at).toLocaleDateString() },
             {
                 label: 'Actions',
                 render: (row) => (
                     <div className="action-buttons">
-                        {/* Validation */}
+                        {/* Validation & Progress */}
                         {row.status === 'pending' && (
                             <ActionButton
-                                icon="fas fa-check-circle"
+                                icon="fa-solid fa-check-circle"
                                 onClick={() => handleValidateOrder(row.id)}
-                                tooltip="Valider la commande"
+                                tooltip="Valider (Mettre en cours)"
                                 variant="success"
                             />
                         )}
 
-                        {/* Processing Flows */}
-                        {row.status === 'validated' && (
+                        {(row.status === 'validated' || row.status === 'processing') && (
                             <ActionButton
-                                icon="fas fa-box-open"
-                                onClick={() => handleUpdateOrderStatus(row.id, 'processing')}
-                                tooltip="Mettre en traitement"
-                                variant="warning"
+                                icon="fa-solid fa-clipboard-check"
+                                onClick={() => handleUpdateOrderStatus(row.id, 'delivered')}
+                                tooltip="Terminer la commande"
+                                variant="success"
                             />
                         )}
-                        {row.status === 'processing' && (
-                            <ActionButton
-                                icon="fas fa-truck"
-                                onClick={() => handleUpdateOrderStatus(row.id, 'shipped')}
-                                tooltip="Expédier"
-                                variant="info"
-                            />
-                        )}
+
                         {row.status === 'shipped' && (
                             <ActionButton
-                                icon="fas fa-clipboard-check"
+                                icon="fa-solid fa-clipboard-check"
                                 onClick={() => handleUpdateOrderStatus(row.id, 'delivered')}
-                                tooltip="Marquer comme livré"
+                                tooltip="Marquer comme terminé"
                                 variant="success"
                             />
                         )}
@@ -999,7 +1842,7 @@ function AdminDashboardPage() {
                         {/* Invoice & Cancel */}
                         {!row.invoice && row.status === 'delivered' && (
                             <ActionButton
-                                icon="fas fa-file-invoice"
+                                icon="fa-solid fa-file-invoice"
                                 onClick={() => handleCreateInvoice(row.id)}
                                 tooltip="Créer facture"
                                 variant="success"
@@ -1007,7 +1850,7 @@ function AdminDashboardPage() {
                         )}
                         {row.status === 'pending' && (
                             <ActionButton
-                                icon="fas fa-times-circle"
+                                icon="fa-solid fa-times-circle"
                                 onClick={() => handleUpdateOrderStatus(row.id, 'cancelled')}
                                 tooltip="Annuler"
                                 variant="danger"
@@ -1016,8 +1859,12 @@ function AdminDashboardPage() {
 
                         {/* View Details */}
                         <ActionButton
-                            icon="fas fa-eye"
-                            onClick={() => console.log('View order', row)}
+                            icon="fa-solid fa-eye"
+                            onClick={() => {
+                                console.log('Opening Order Modal for:', row.order_number);
+                                setSelectedOrder(row);
+                                setShowOrderModal(true);
+                            }}
                             tooltip="Voir détails"
                             variant="primary"
                         />
@@ -1051,10 +1898,8 @@ function AdminDashboardPage() {
                             label="Statut"
                             options={[
                                 { value: 'pending', label: 'En attente' },
-                                { value: 'validated', label: 'Validée' },
                                 { value: 'processing', label: 'En cours' },
-                                { value: 'shipped', label: 'Expédiée' },
-                                { value: 'delivered', label: 'Livrée' }
+                                { value: 'delivered', label: 'Terminée' }
                             ]}
                             value={orderFilter.status}
                             onChange={(value) => setOrderFilter({ ...orderFilter, status: value })}
@@ -1087,7 +1932,7 @@ function AdminDashboardPage() {
                 render: (row) => (
                     <div className="product-cell">
                         <div className="product-icon-small">
-                            <i className={row.type === 'service' ? 'fas fa-concierge-bell' : 'fas fa-box'}></i>
+                            <i className={row.type === 'service' ? 'fa-solid fa-concierge-bell' : 'fa-solid fa-box'}></i>
                         </div>
                         <span>{row.name}</span>
                     </div>
@@ -1100,9 +1945,31 @@ function AdminDashboardPage() {
                 label: 'Stock',
                 render: (row) => (
                     <Badge
-                        text={`${row.stock_quantity} un.`}
+                        text={`${row.stock_quantity || 0} un.`}
                         variant={row.stock_quantity < 5 ? 'danger' : 'success'}
                     />
+                )
+            },
+            {
+                label: 'Actions',
+                render: (row) => (
+                    <div className="action-buttons">
+                        <ActionButton
+                            icon="fa-solid fa-edit"
+                            onClick={() => {
+                                setEditingProduct(row);
+                                setShowProductModal(true);
+                            }}
+                            tooltip="Modifier"
+                            variant="primary"
+                        />
+                        <ActionButton
+                            icon="fa-solid fa-trash"
+                            onClick={() => handleDeleteProduct(row.id)}
+                            tooltip="Supprimer"
+                            variant="danger"
+                        />
+                    </div>
                 )
             }
         ];
@@ -1117,6 +1984,12 @@ function AdminDashboardPage() {
                                 {filteredProducts.length} produit(s) en stock
                             </p>
                         </div>
+                        <button className="btn btn-primary" onClick={() => {
+                            setEditingProduct(null);
+                            setShowProductModal(true);
+                        }}>
+                            <i className="fa-solid fa-plus"></i> Nouvel Article
+                        </button>
                     </div>
 
                     <div className="module-toolbar" style={{ marginBottom: '20px', display: 'flex', gap: '20px' }}>
@@ -1163,11 +2036,33 @@ function AdminDashboardPage() {
                 render: (row) => row.user ? `${row.user.first_name} ${row.user.last_name}` : 'N/A'
             },
             { label: 'Priorité', render: (row) => <Badge text={row.priority} variant={getPriorityVariant(row.priority)} /> },
+            { label: 'Statut', render: (row) => <Badge text={row.status} variant={getStatusVariant(row.status)} /> },
+            { label: 'Date', render: (row) => new Date(row.created_at).toLocaleDateString() },
             {
-                label: 'Statut',
-                render: (row) => <Badge text={row.status} variant={getStatusVariant(row.status)} />
-            },
-            { label: 'Date', render: (row) => new Date(row.created_at).toLocaleDateString() }
+                label: 'Actions',
+                render: (row) => (
+                    <div className="action-buttons">
+                        <ActionButton
+                            icon="fa-solid fa-eye"
+                            onClick={() => {
+                                console.log('Opening Maintenance Modal for:', row.id);
+                                setSelectedMaintenance(row);
+                                setShowMaintenanceModal(true);
+                            }}
+                            tooltip="Voir détails"
+                            variant="primary"
+                        />
+                        {row.status === 'new' && (
+                            <ActionButton
+                                icon="fa-solid fa-robot"
+                                onClick={() => handleAutoAssignTechnician(row.id)}
+                                tooltip="Assignation auto"
+                                variant="info"
+                            />
+                        )}
+                    </div>
+                )
+            }
         ];
 
         return (
@@ -1287,7 +2182,7 @@ function AdminDashboardPage() {
                         className={activeModule === 'dashboard' ? 'active' : ''}
                         onClick={() => setActiveModule('dashboard')}
                     >
-                        <i className="fas fa-th-large"></i>
+                        <i className="fa-solid fa-th-large"></i>
                         <span>Dashboard Admin</span>
                     </button>
 
@@ -1295,7 +2190,7 @@ function AdminDashboardPage() {
                         className={activeModule === 'users' ? 'active' : ''}
                         onClick={() => setActiveModule('users')}
                     >
-                        <i className="fas fa-users"></i>
+                        <i className="fa-solid fa-users"></i>
                         <span>Utilisateurs</span>
                     </button>
 
@@ -1303,7 +2198,7 @@ function AdminDashboardPage() {
                         className={activeModule === 'quotes' ? 'active' : ''}
                         onClick={() => setActiveModule('quotes')}
                     >
-                        <i className="fas fa-file-invoice-dollar"></i>
+                        <i className="fa-solid fa-file-invoice-dollar"></i>
                         <span>Commandes & Devis</span>
                     </button>
 
@@ -1311,7 +2206,7 @@ function AdminDashboardPage() {
                         className={activeModule === 'products' ? 'active' : ''}
                         onClick={() => setActiveModule('products')}
                     >
-                        <i className="fas fa-box"></i>
+                        <i className="fa-solid fa-box"></i>
                         <span>Stocks</span>
                     </button>
 
@@ -1319,7 +2214,7 @@ function AdminDashboardPage() {
                         className={activeModule === 'maintenance' ? 'active' : ''}
                         onClick={() => setActiveModule('maintenance')}
                     >
-                        <i className="fas fa-tools"></i>
+                        <i className="fa-solid fa-tools"></i>
                         <span>Techniciens</span>
                     </button>
 
@@ -1327,7 +2222,7 @@ function AdminDashboardPage() {
                         className={activeModule === 'audit' ? 'active' : ''}
                         onClick={() => setActiveModule('audit')}
                     >
-                        <i className="fas fa-clipboard-list"></i>
+                        <i className="fa-solid fa-clipboard-list"></i>
                         <span>Rapports</span>
                     </button>
 
@@ -1335,14 +2230,14 @@ function AdminDashboardPage() {
                         className={activeModule === 'settings' ? 'active' : ''}
                         onClick={() => setActiveModule('settings')}
                     >
-                        <i className="fas fa-cog"></i>
+                        <i className="fa-solid fa-cog"></i>
                         <span>Paramètres</span>
                     </button>
                 </div>
 
                 <div className="sidebar-footer">
                     <button className="logout-btn" onClick={handleLogout}>
-                        <i className="fas fa-sign-out-alt"></i>
+                        <i className="fa-solid fa-sign-out-alt"></i>
                         <span>Se déconnecter</span>
                     </button>
                 </div>
@@ -1359,7 +2254,7 @@ function AdminDashboardPage() {
 
                     <div className="header-right">
                         <div className="search-bar">
-                            <i className="fas fa-search"></i>
+                            <i className="fa-solid fa-search"></i>
                             <input type="text" placeholder="Rechercher..." />
                         </div>
 
@@ -1414,6 +2309,7 @@ function AdminDashboardPage() {
             {/* Modals */}
             {showUserModal && (
                 <Modal
+                    isOpen={true}
                     title={editingUser ? "Modifier l'utilisateur" : "Nouvel utilisateur"}
                     onClose={() => {
                         setShowUserModal(false);
@@ -1421,13 +2317,85 @@ function AdminDashboardPage() {
                     }}
                     size="medium"
                 >
-                    {renderUserForm()}
+                    <UserForm
+                        user={editingUser}
+                        onCancel={() => {
+                            setShowUserModal(false);
+                            setEditingUser(null);
+                        }}
+                        onSave={async (userId, userData) => {
+                            try {
+                                if (userId) {
+                                    await adminApi.updateUser(userId, userData);
+                                    addToast('Utilisateur mis à jour', 'success');
+                                } else {
+                                    await adminApi.createUser(userData);
+                                    addToast('Utilisateur créé avec succès', 'success');
+                                }
+                                await loadUsers();
+                                setShowUserModal(false);
+                            } catch (error) {
+                                console.error('User form error:', error);
+                                addToast(error.response?.data?.message || 'Erreur lors de l\'opération', 'error');
+                            }
+                        }}
+                    />
                 </Modal>
             )}
 
-            {/* Other Modals... (Keeping existing modal logic) */}
+            {showProductModal && (
+                <Modal
+                    isOpen={true}
+                    title={editingProduct ? "Modifier l'article" : "Nouvel article"}
+                    onClose={() => {
+                        setShowProductModal(false);
+                        setEditingProduct(null);
+                    }}
+                    size="medium"
+                >
+                    <ProductForm
+                        product={editingProduct}
+                        onCancel={() => {
+                            setShowProductModal(false);
+                            setEditingProduct(null);
+                        }}
+                        onSave={(productId, productData) => {
+                            if (productId) {
+                                handleEditProduct(productId, productData);
+                            } else {
+                                handleCreateProduct(productData);
+                            }
+                        }}
+                    />
+                </Modal>
+            )}
+
+            {showQuoteEditModal && selectedQuote && (
+                <Modal
+                    isOpen={true}
+                    title={`Modifier le devis #${selectedQuote.quote_number}`}
+                    onClose={() => {
+                        setShowQuoteEditModal(false);
+                        setSelectedQuote(null);
+                    }}
+                    size="large"
+                >
+                    <QuoteEditForm
+                        quote={selectedQuote}
+                        onCancel={() => {
+                            setShowQuoteEditModal(false);
+                            setSelectedQuote(null);
+                        }}
+                        onSuccess={() => setShowQuoteEditModal(false)}
+                        onToast={addToast}
+                        loadData={loadQuotes}
+                    />
+                </Modal>
+            )}
+
             {showQuoteModal && selectedQuote && (
                 <Modal
+                    isOpen={true}
                     title={`Détails du devis #${selectedQuote.quote_number}`}
                     onClose={() => {
                         setShowQuoteModal(false);
@@ -1440,6 +2408,7 @@ function AdminDashboardPage() {
             )}
             {showInvoiceModal && selectedInvoice && (
                 <Modal
+                    isOpen={true}
                     title={`Facture #${selectedInvoice.invoice_number}`}
                     onClose={() => {
                         setShowInvoiceModal(false);
@@ -1450,6 +2419,50 @@ function AdminDashboardPage() {
                     {renderInvoiceDetails()}
                 </Modal>
             )}
+
+            {showOrderModal && selectedOrder && (
+                <Modal
+                    isOpen={true}
+                    title={`Détails de la commande #${selectedOrder.order_number}`}
+                    onClose={() => {
+                        setShowOrderModal(false);
+                        setSelectedOrder(null);
+                    }}
+                    size="large"
+                >
+                    {renderOrderDetails()}
+                </Modal>
+            )}
+
+            {showMaintenanceModal && selectedMaintenance && (
+                <Modal
+                    isOpen={true}
+                    title={`Intervention #${selectedMaintenance.id}`}
+                    onClose={() => {
+                        setShowMaintenanceModal(false);
+                        setSelectedMaintenance(null);
+                    }}
+                    size="large"
+                >
+                    {renderMaintenanceDetails()}
+                </Modal>
+            )}
+
+            {/* Notification & Confirmation Components */}
+            <ToastContainer toasts={toasts} removeToast={removeToast} />
+
+            <ConfirmationModal
+                isOpen={confirmModal.isOpen}
+                onClose={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+                onConfirm={confirmModal.onConfirm}
+                title={confirmModal.title}
+                message={confirmModal.message}
+                confirmText={confirmModal.confirmText}
+                type={confirmModal.type}
+                requireInput={confirmModal.requireInput}
+                inputLabel={confirmModal.inputLabel}
+                inputPlaceholder={confirmModal.inputPlaceholder}
+            />
         </div>
     );
 }

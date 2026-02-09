@@ -34,6 +34,13 @@ class TechnicianRepository extends BaseRepository {
             include: [{ model: User, as: 'user' }]
         });
     }
+
+    async findByUserId(userId) {
+        return await this.model.findOne({
+            where: { user_id: userId },
+            include: [{ model: User, as: 'user' }]
+        });
+    }
 }
 
 module.exports = new TechnicianRepository();

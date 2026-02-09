@@ -1,4 +1,5 @@
 const quoteService = require('../services/quoteService');
+const orderService = require('../services/orderService');
 const ResponseHandler = require('../utils/responseHandler');
 
 class QuoteController {
@@ -46,6 +47,19 @@ class QuoteController {
             const quote = await quoteService.updateStatus(id, status);
             return ResponseHandler.success(res, quote, 'Statut du devis mis à jour');
         } catch (error) {
+            return ResponseHandler.serverError(res, error);
+        }
+    }
+
+    async updateQuote(req, res) {
+        try {
+            const { id } = req.params;
+            const quote = await quoteService.updateQuote(id, req.body);
+            return ResponseHandler.success(res, quote, 'Devis mis à jour avec succès');
+        } catch (error) {
+            if (error.message === 'Devis non trouvé') {
+                return ResponseHandler.notFound(res, error.message);
+            }
             return ResponseHandler.serverError(res, error);
         }
     }
@@ -114,7 +128,11 @@ class QuoteController {
         try {
             const { id } = req.params;
             const quote = await quoteService.updateStatus(id, 'accepted');
-            return ResponseHandler.success(res, quote, 'Devis approuvé avec succès');
+
+            // Create order automatically from accepted quote
+            await orderService.createFromQuote(id);
+
+            return ResponseHandler.success(res, quote, 'Devis approuvé et commande générée avec succès');
         } catch (error) {
             return ResponseHandler.serverError(res, error);
         }

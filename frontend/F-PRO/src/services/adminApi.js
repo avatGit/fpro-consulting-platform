@@ -77,6 +77,11 @@ export const rejectQuote = async (quoteId, reason) => {
     return response.data;
 };
 
+export const updateQuote = async (quoteId, data) => {
+    const response = await api.put(`/quotes/${quoteId}`, data);
+    return response.data;
+};
+
 // ============================================
 // INVOICE MANAGEMENT
 // ============================================
@@ -162,10 +167,6 @@ export const initDefaultSettings = async () => {
 // ORDERS (Enhanced)
 // ============================================
 
-// ============================================
-// ORDERS (Enhanced)
-// ============================================
-
 export const getAllOrders = async (filters = {}) => {
     const response = await api.get('/orders/all', { params: filters });
     return response.data;
@@ -178,6 +179,30 @@ export const updateOrderStatus = async (orderId, status) => {
 
 export const validateOrder = async (orderId) => {
     const response = await api.post(`/orders/${orderId}/validate`);
+    return response.data;
+};
+
+// ============================================
+// PRODUCT MANAGEMENT
+// ============================================
+
+export const getAllProducts = async () => {
+    const response = await api.get('/products');
+    return response.data;
+};
+
+export const createProduct = async (productData) => {
+    const response = await api.post('/products', productData);
+    return response.data;
+};
+
+export const updateProduct = async (productId, productData) => {
+    const response = await api.put(`/products/${productId}`, productData);
+    return response.data;
+};
+
+export const deleteProduct = async (productId) => {
+    const response = await api.delete(`/products/${productId}`);
     return response.data;
 };
 
@@ -218,6 +243,7 @@ export default {
     getAllQuotes,
     approveQuote,
     rejectQuote,
+    updateQuote,
 
     // Invoices
     createInvoice,
@@ -242,6 +268,12 @@ export default {
     getAllOrders,
     updateOrderStatus,
     validateOrder,
+
+    // Products
+    getAllProducts,
+    createProduct,
+    updateProduct,
+    deleteProduct,
 
     // Maintenance
     getAllMaintenanceRequests,

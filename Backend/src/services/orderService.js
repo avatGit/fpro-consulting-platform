@@ -1,9 +1,49 @@
 const orderRepository = require('../repositories/orderRepository');
 const quoteRepository = require('../repositories/quoteRepository');
 const productRepository = require('../repositories/productRepository');
+const cartService = require('./cartService');
+const quoteService = require('./quoteService');
 const { sequelize } = require('../models');
 
 class OrderService {
+    /**
+     * Create an order directly from the cart (auto-generates quote)
+     */
+    async createFromCart(userId, companyId) {
+        // 1. Generate Quote automatically (this will also clear the cart)
+        const quote = await quoteService.createFromCart(userId, companyId);
+
+        // 2. Create Order from that Quote
+        const transaction = await sequelize.transaction();
+        try {
+            const orderNumber = await orderRepository.generateOrderNumber();
+            const orderData = {
+                order_number: orderNumber,
+                quote_id: quote.id,
+                user_id: userId,
+                company_id: companyId,
+                status: 'pending',
+                payment_status: 'pending',
+                total_amount: quote.total_amount
+            };
+
+            const orderItems = quote.items.map(item => ({
+                product_id: item.product_id,
+                quantity: item.quantity,
+                unit_price: item.unit_price,
+                subtotal: item.subtotal
+            }));
+
+            const order = await orderRepository.createWithItems(orderData, orderItems, transaction);
+            await transaction.commit();
+
+            return await orderRepository.findWithDetails(order.id);
+        } catch (error) {
+            await transaction.rollback();
+            throw error;
+        }
+    }
+
     async createFromQuote(quoteId) {
         const quote = await quoteRepository.findWithDetails(quoteId);
         if (!quote) throw new Error('Devis non trouvé');
@@ -33,9 +73,6 @@ class OrderService {
             }));
 
             const order = await orderRepository.createWithItems(orderData, orderItems, transaction);
-
-            // Mark quote as converted? (handled by quote status update usually)
-
             await transaction.commit();
             return await orderRepository.findWithDetails(order.id);
         } catch (error) {
@@ -61,12 +98,11 @@ class OrderService {
                     if (product) {
                         await product.decrement('stock_quantity', { by: item.quantity, transaction });
                     }
-                } else if (!item.product) {
-                    console.warn(`Product not found for order item ${item.id} (product_id: ${item.product_id})`);
                 }
             }
 
-            await order.update({ status: 'validated' }, { transaction });
+            // Move to 'processing' which represents 'In Progress' for the frontend
+            await order.update({ status: 'processing' }, { transaction });
             await transaction.commit();
             return await orderRepository.findWithDetails(orderId);
         } catch (error) {
@@ -79,7 +115,12 @@ class OrderService {
         const order = await orderRepository.findWithDetails(orderId);
         if (!order) throw new Error('Commande non trouvée');
 
-        await order.update({ status });
+        // Map 'completed' to 'delivered'
+        let finalStatus = status;
+        if (status === 'completed') finalStatus = 'delivered';
+        if (status === 'in_progress') finalStatus = 'processing';
+
+        await order.update({ status: finalStatus });
         return await orderRepository.findWithDetails(orderId);
     }
 
