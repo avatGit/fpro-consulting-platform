@@ -5,6 +5,7 @@ import '../providers/admin_provider.dart';
 import '../models/product.dart';
 import '../models/rental_item.dart';
 import '../models/maintenance_request.dart';
+import '../models/user_profile.dart';
 import '../widgets/admin_product_dialog.dart';
 import '../providers/cart_provider.dart';
 import '../models/order.dart';
@@ -76,6 +77,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             _buildDrawerItem('Locations', Icons.event),
             _buildDrawerItem('Commandes', Icons.shopping_bag),
             _buildDrawerItem('Maintenance', Icons.build),
+            _buildDrawerItem('Staff', Icons.people),
             const Spacer(),
             const Divider(),
             ListTile(
@@ -132,6 +134,8 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         return _buildOrdersList();
       case 'Maintenance':
         return _buildMaintenanceList();
+      case 'Staff':
+        return _buildStaffList();
       default:
         return _buildOverview();
     }
@@ -528,6 +532,145 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
     );
   }
 
+  Widget _buildStaffList() {
+    return Consumer<AdminProvider>(
+      builder: (context, admin, child) {
+        final allStaff = [...admin.agents, ...admin.technicians];
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Gestion du Personnel',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+                ElevatedButton.icon(
+                  onPressed: _showAddStaffDialog,
+                  icon: const Icon(Icons.person_add),
+                  label: const Text('Nouveau'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryBlue,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: allStaff.length,
+              itemBuilder: (context, index) {
+                final staff = allStaff[index];
+                return Card(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: staff.role == 'agent' ? Colors.blue[100] : Colors.red[100],
+                      child: Icon(
+                        staff.role == 'agent' ? Icons.support_agent : Icons.engineering,
+                        color: staff.role == 'agent' ? Colors.blue : Colors.red,
+                      ),
+                    ),
+                    title: Text(staff.name, style: const TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text('Rôle: ${staff.role.toUpperCase()} | Email: ${staff.email}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.edit, color: Colors.blue),
+                          onPressed: () => _showEditStaffDialog(staff),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete, color: Colors.red),
+                          onPressed: () {
+                            showDialog(
+                              context: context,
+                              builder: (context) => AlertDialog(
+                                title: const Text('Confirmer la suppression'),
+                                content: Text('Voulez-vous vraiment supprimer ${staff.name} ?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(context),
+                                    child: const Text('Annuler'),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      if (staff.role == 'agent') {
+                                        context.read<AdminProvider>().deleteAgent(staff.id);
+                                      } else {
+                                        context.read<AdminProvider>().deleteTechnician(staff.id);
+                                      }
+                                      Navigator.pop(context);
+                                    },
+                                    child: const Text('Supprimer', style: TextStyle(color: Colors.red)),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showEditStaffDialog(dynamic staff) {
+    final nameController = TextEditingController(text: staff.name);
+    final phoneController = TextEditingController(text: staff.phone);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Modifier ${staff.role}'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameController,
+              decoration: const InputDecoration(labelText: 'Nom complet'),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: phoneController,
+              decoration: const InputDecoration(labelText: 'Téléphone'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Annuler'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              final updatedUser = (staff as UserProfile).copyWith(
+                name: nameController.text,
+                phone: phoneController.text,
+              );
+              if (staff.role == 'agent') {
+                context.read<AdminProvider>().updateAgent(updatedUser);
+              } else {
+                context.read<AdminProvider>().updateTechnician(updatedUser);
+              }
+              Navigator.pop(context);
+            },
+            child: const Text('Enregistrer'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _updateMaintenance(MaintenanceRequest request) {
     String? selectedTech = request.technicianName;
     MaintenanceStatus selectedStatus = request.status;
@@ -581,6 +724,78 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                 Navigator.pop(context);
               },
               child: const Text('Enregistrer'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAddStaffDialog() {
+    final nameController = TextEditingController();
+    final emailController = TextEditingController();
+    final phoneController = TextEditingController();
+    String selectedRole = 'agent';
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Ajouter un Personnel'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DropdownButtonFormField<String>(
+                  value: selectedRole,
+                  decoration: const InputDecoration(labelText: 'Rôle'),
+                  items: const [
+                    DropdownMenuItem(value: 'agent', child: Text('Agent')),
+                    DropdownMenuItem(value: 'technician', child: Text('Technicien')),
+                  ],
+                  onChanged: (v) => setDialogState(() => selectedRole = v!),
+                ),
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Nom complet'),
+                ),
+                TextField(
+                  controller: emailController,
+                  decoration: const InputDecoration(labelText: 'Email'),
+                ),
+                TextField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(labelText: 'Téléphone'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final id = '${selectedRole[0]}${DateTime.now().millisecondsSinceEpoch}';
+                final newUser = UserProfile(
+                  id: id,
+                  name: nameController.text,
+                  role: selectedRole,
+                  email: emailController.text,
+                  company: 'F-PRO',
+                  phone: phoneController.text,
+                  memberSince: DateTime.now(),
+                );
+
+                if (selectedRole == 'agent') {
+                  context.read<AdminProvider>().addAgent(newUser);
+                } else {
+                  context.read<AdminProvider>().addTechnician(newUser);
+                }
+                Navigator.pop(context);
+              },
+              child: const Text('Ajouter'),
             ),
           ],
         ),

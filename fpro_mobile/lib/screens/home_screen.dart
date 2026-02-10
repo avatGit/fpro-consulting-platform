@@ -191,26 +191,42 @@ class HomeScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 25),
                     
-                    // Service Cards
-                    _buildServiceCard(
-                      icon: Icons.print,
-                      title: 'Consommables',
-                      description: 'Papier, encres, accessoires\ninformatiques',
-                      context: context,
-                    ),
-                    const SizedBox(height: 15),
-                    _buildServiceCard(
-                      icon: Icons.build,
-                      title: 'Maintenance',
-                      description: 'Maintenance équipements\ninformatiques et bureautiques',
-                      context: context,
-                    ),
-                    const SizedBox(height: 15),
-                    _buildServiceCard(
-                      icon: Icons.laptop,
-                      title: 'Solutions Digitales',
-                      description: 'Développement web, applications et\nsolutions sur mesure',
-                      context: context,
+                    // Service Cards - HORIZONTAL
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          SizedBox(
+                            width: 280,
+                            child: _buildServiceCard(
+                              icon: Icons.print,
+                              title: 'Consommables',
+                              description: 'Papier, encres, accessoires\ninformatiques',
+                              context: context,
+                            ),
+                          ),
+                          const SizedBox(width: 15),
+                          SizedBox(
+                            width: 280,
+                            child: _buildServiceCard(
+                              icon: Icons.build,
+                              title: 'Maintenance',
+                              description: 'Maintenance équipements\ninformatiques et bureautiques',
+                              context: context,
+                            ),
+                          ),
+                          const SizedBox(width: 15),
+                          SizedBox(
+                            width: 280,
+                            child: _buildServiceCard(
+                              icon: Icons.laptop,
+                              title: 'Solutions Digitales',
+                              description: 'Développement web, applications et\nsolutions sur mesure',
+                              context: context,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),

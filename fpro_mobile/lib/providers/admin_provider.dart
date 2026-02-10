@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/product.dart';
 import '../models/maintenance_request.dart';
 import '../models/rental_item.dart';
+import '../models/user_profile.dart';
 
 class AdminProvider extends ChangeNotifier {
   bool _isLoggedIn = false;
@@ -82,18 +83,108 @@ class AdminProvider extends ChangeNotifier {
   List<RentalItem> get rentalItems => List.unmodifiable(_rentalItems);
   List<MaintenanceRequest> get maintenanceRequests => List.unmodifiable(_maintenanceRequests);
 
+  final List<UserProfile> _agents = [
+    UserProfile(
+      id: 'a1',
+      name: 'Agent Fatou',
+      role: 'agent',
+      email: 'agent@fpro.com',
+      company: 'F-PRO',
+      phone: '771234567',
+      memberSince: DateTime.now(),
+    ),
+  ];
+
+  final List<UserProfile> _technicians = [
+    UserProfile(
+      id: 't1',
+      name: 'Moussa Diop',
+      role: 'technician',
+      email: 'moussa@fpro.com',
+      company: 'F-PRO',
+      phone: '779876543',
+      memberSince: DateTime.now(),
+    ),
+  ];
+
+  List<UserProfile> get agents => List.unmodifiable(_agents);
+  List<UserProfile> get technicians => List.unmodifiable(_technicians);
+
   // Auth
+  String? _currentRole;
+  String? get currentRole => _currentRole;
+
   bool login(String username, String password) {
     if (username == 'admin' && password == 'admin123') {
       _isLoggedIn = true;
+      _currentRole = 'admin';
       notifyListeners();
       return true;
     }
+    
+    // Check Agents
+    for (var agent in _agents) {
+      if (username == agent.email && password == 'agent123') {
+        _isLoggedIn = true;
+        _currentRole = 'agent';
+        notifyListeners();
+        return true;
+      }
+    }
+
+    // Check Technicians
+    for (var tech in _technicians) {
+      if (username == tech.email && password == 'tech123') {
+        _isLoggedIn = true;
+        _currentRole = 'technician';
+        notifyListeners();
+        return true;
+      }
+    }
+    
     return false;
   }
 
   void logout() {
     _isLoggedIn = false;
+    _currentRole = null;
+    notifyListeners();
+  }
+
+  // User Management
+  void addAgent(UserProfile user) {
+    _agents.add(user);
+    notifyListeners();
+  }
+
+  void updateAgent(UserProfile user) {
+    final index = _agents.indexWhere((u) => u.id == user.id);
+    if (index >= 0) {
+      _agents[index] = user;
+      notifyListeners();
+    }
+  }
+
+  void deleteAgent(String id) {
+    _agents.removeWhere((u) => u.id == id);
+    notifyListeners();
+  }
+
+  void addTechnician(UserProfile user) {
+    _technicians.add(user);
+    notifyListeners();
+  }
+
+  void updateTechnician(UserProfile user) {
+    final index = _technicians.indexWhere((u) => u.id == user.id);
+    if (index >= 0) {
+      _technicians[index] = user;
+      notifyListeners();
+    }
+  }
+
+  void deleteTechnician(String id) {
+    _technicians.removeWhere((u) => u.id == id);
     notifyListeners();
   }
 

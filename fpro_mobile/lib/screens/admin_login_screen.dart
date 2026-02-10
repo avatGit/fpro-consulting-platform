@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/admin_provider.dart';
 import 'admin_dashboard_screen.dart';
+import 'agent_dashboard_screen.dart';
+import 'technician_dashboard_screen.dart';
 
 class AdminLoginScreen extends StatefulWidget {
   const AdminLoginScreen({super.key});
@@ -30,10 +32,26 @@ class _AdminLoginScreenState extends State<AdminLoginScreen> {
     });
 
     if (success) {
+      final role = context.read<AdminProvider>().currentRole;
+      Widget targetScreen;
+      
+      switch (role) {
+        case 'agent':
+          targetScreen = const AgentDashboardScreen();
+          break;
+        case 'technician':
+          targetScreen = const TechnicianDashboardScreen();
+          break;
+        case 'admin':
+        default:
+          targetScreen = const AdminDashboardScreen();
+          break;
+      }
+
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
-          builder: (context) => const AdminDashboardScreen(),
+          builder: (context) => targetScreen,
         ),
       );
     } else {
