@@ -16,8 +16,9 @@ const authorize = (...allowedRoles) => {
 
     // Vérifier que l'utilisateur a le bon rôle
     if (!allowedRoles.includes(req.userRole)) {
+      console.log(`[DEBUG] RBAC Forbidden: User role=${req.userRole}, Allowed=${allowedRoles}`);
       return ResponseHandler.forbidden(
-        res, 
+        res,
         `Accès refusé. Rôle requis : ${allowedRoles.join(' ou ')}. Votre rôle : ${req.userRole}`
       );
     }

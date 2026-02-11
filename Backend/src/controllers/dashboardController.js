@@ -29,11 +29,11 @@ const dashboardController = {
                         }
                     }
                 }),
-                // Devis en attente (envoyés mais pas encore acceptés/refusés)
+                // Devis acceptés (qui sont devenus des commandes)
                 Quote.count({
                     where: {
                         user_id: userId,
-                        status: 'sent'
+                        status: 'accepted'
                     }
                 }),
                 // Interventions en cours
@@ -68,7 +68,10 @@ const dashboardController = {
                     attributes: ['id', 'order_number', 'status', 'created_at']
                 }),
                 Quote.findAll({
-                    where: { user_id: userId },
+                    where: {
+                        user_id: userId,
+                        status: 'accepted'
+                    },
                     limit: 5,
                     order: [['created_at', 'DESC']],
                     attributes: ['id', 'quote_number', 'status', 'created_at']

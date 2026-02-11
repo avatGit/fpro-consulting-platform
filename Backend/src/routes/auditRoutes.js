@@ -5,8 +5,12 @@ const { authenticate } = require('../middleware/authMiddleware');
 const { authorize } = require('../middleware/rbacMiddleware');
 
 // Toutes les routes nécessitent d'être admin ou agent
-router.use(authenticate);
-router.use(authorize('admin', 'agent'));
+// router.use(authenticate);
+// router.use(authorize('admin', 'agent'));
+
+router.get('/', authenticate, authorize('admin', 'agent'), auditController.listAuditLogs);
+router.get('/stats', authenticate, authorize('admin', 'agent'), auditController.getAuditStats);
+router.get('/:id', authenticate, authorize('admin', 'agent'), auditController.getAuditLog);
 
 /**
  * @swagger

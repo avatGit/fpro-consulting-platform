@@ -35,7 +35,8 @@ router.get('/', orderController.listUserOrders);
 
 // Routes Admin & Agent
 router.get('/all', authorize('admin', 'agent'), orderController.listAllOrders);
-router.patch('/:id/status', authorize('admin', 'agent'), orderController.updateOrderStatus);
+router.patch('/:id/status', authorize('agent'), orderController.updateOrderStatus);
+router.post('/:id/cancel', authorize('agent'), orderController.cancelOrder);
 
 /**
  * @swagger
@@ -44,7 +45,7 @@ router.patch('/:id/status', authorize('admin', 'agent'), orderController.updateO
  *     summary: Valider une commande (impacte le stock)
  *     tags: [Orders]
  */
-router.post('/:id/validate', authorize('admin'), orderController.validateOrder);
+router.post('/:id/validate', authorize('agent'), orderController.validateOrder);
 
 router.get('/:id', orderController.getOrder);
 

@@ -1,4 +1,5 @@
 import React from 'react'
+import { SocketProvider } from './context/SocketContext'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import HomePage from './pages/HomePage'
 import RegisterPage from './pages/RegisterPage'
@@ -47,37 +48,39 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
 function App() {
     return (
         <Router>
-            <Routes>
-                <Route path="/" element={<HomePage />} />
-                <Route path="/register" element={<RegisterPage />} />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/dashboard" element={
-                    <ProtectedRoute allowedRoles={['client', 'admin', 'agent']}>
-                        <DashboardPage />
-                    </ProtectedRoute>
-                } />
+            <SocketProvider>
+                <Routes>
+                    <Route path="/" element={<HomePage />} />
+                    <Route path="/register" element={<RegisterPage />} />
+                    <Route path="/login" element={<LoginPage />} />
+                    <Route path="/dashboard" element={
+                        <ProtectedRoute allowedRoles={['client', 'admin', 'agent']}>
+                            <DashboardPage />
+                        </ProtectedRoute>
+                    } />
 
-                {/* Admin & Agent Routes */}
-                <Route path="/admin" element={
-                    <ProtectedRoute allowedRoles={['admin']}>
-                        <AdminDashboardPage />
-                    </ProtectedRoute>
-                } />
-                <Route path="/agent" element={
-                    <ProtectedRoute allowedRoles={['agent', 'admin']}>
-                        <AgentDashboardPage />
-                    </ProtectedRoute>
-                } />
-                <Route path="/technician" element={
-                    <ProtectedRoute allowedRoles={['technicien', 'admin']}>
-                        <TechnicianDashboardPage />
-                    </ProtectedRoute>
-                } />
+                    {/* Admin & Agent Routes */}
+                    <Route path="/admin" element={
+                        <ProtectedRoute allowedRoles={['admin']}>
+                            <AdminDashboardPage />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/agent" element={
+                        <ProtectedRoute allowedRoles={['agent', 'admin']}>
+                            <AgentDashboardPage />
+                        </ProtectedRoute>
+                    } />
+                    <Route path="/technician" element={
+                        <ProtectedRoute allowedRoles={['technicien', 'admin']}>
+                            <TechnicianDashboardPage />
+                        </ProtectedRoute>
+                    } />
 
-                {/* Legacy redirect or alternate paths */}
-                <Route path="/admin/login" element={<AdminLoginPage />} />
-                <Route path="/admin/dashboard" element={<Navigate to="/admin" replace />} />
-            </Routes>
+                    {/* Legacy redirect or alternate paths */}
+                    <Route path="/admin/login" element={<AdminLoginPage />} />
+                    <Route path="/admin/dashboard" element={<Navigate to="/admin" replace />} />
+                </Routes>
+            </SocketProvider>
         </Router>
     )
 }

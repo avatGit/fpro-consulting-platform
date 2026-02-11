@@ -13,89 +13,144 @@
 
 /* Sidebar Styling */
 .admin-sidebar {
-    width: 290px;
-    background: #0A1931;
-    /* Deep Navy Blue */
+    width: 240px;
+    background: linear-gradient(180deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
     display: flex;
     flex-direction: column;
     color: white;
     transition: width 0.3s;
     flex-shrink: 0;
+    position: fixed;
+    height: 100vh;
+    left: 0;
+    top: 0;
+    box-shadow: var(--shadow-lg);
+    z-index: 100;
 }
 
-.sidebar-header {
-    padding: 40px 30px;
-    margin-bottom: 20px;
+.admin-sidebar-header {
+    padding: var(--spacing-xl);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.sidebar-header h2 {
-    font-size: 26px;
-    font-weight: 700;
-    margin: 0;
-    /* F-PRO styling handled by Logo component, but assuming text here */
-    color: white;
-    letter-spacing: 0.5px;
+.sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
 }
 
-.sidebar-nav {
+.admin-badge-sidebar {
+    background: rgba(255, 255, 255, 0.2);
+    color: var(--white);
+    padding: var(--spacing-xs) var(--spacing-md);
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-align: center;
+    margin-top: var(--spacing-md);
+}
+
+.admin-nav {
     flex: 1;
-    padding: 0 16px;
+    padding: var(--spacing-lg) 0;
     overflow-y: auto;
     display: flex;
     flex-direction: column;
-    gap: 8px;
-    /* Spacing between items */
+    gap: var(--spacing-xs);
+}
+
+.admin-nav-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-md) var(--spacing-xl) !important;
+    margin-bottom: var(--spacing-sm) !important;
+    background: none;
+    border: none;
+    color: #FFFFFF !important;
+    font-size: var(--font-size-base);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    border-left: 3px solid transparent;
+    text-align: left;
+}
+
+.admin-nav-item:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+.admin-nav-item.active {
+    background-color: rgba(255, 255, 255, 0.15);
+    border-left-color: var(--white);
+    font-weight: 600;
+}
+
+.nav-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    opacity: 0.9;
+}
+
+.nav-label {
+    flex: 1;
+}
+
+.nav-arrow {
+    opacity: 0.7;
+    font-size: var(--font-size-xl);
+}
+
+/* Legacy sidebar-nav styles - keeping for backwards compatibility but overriding */
+.sidebar-nav {
+    flex: 1;
+    padding: var(--spacing-lg) 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
 }
 
 .sidebar-nav button {
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 16px;
-    padding: 16px 20px;
-    /* Larger padding */
+    justify-content: space-between;
+    padding: var(--spacing-md) var(--spacing-xl) !important;
+    margin-bottom: var(--spacing-sm) !important;
     background: transparent;
     border: none;
-    border-radius: 0;
-    /* Design shows specific highlights, maybe indicator bar */
-    color: #A3AED0;
-    /* Gray text for inactive */
-    font-size: 16px;
+    border-left: 3px solid transparent;
+    color: #FFFFFF !important;
+    font-size: var(--font-size-base);
     font-weight: 500;
     cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
+    transition: all var(--transition-fast);
+    text-align: left;
 }
 
 .sidebar-nav button i {
-    font-size: 20px;
-    width: 24px;
-    text-align: center;
+    font-size: 1.1rem;
+    opacity: 0.9;
 }
 
 .sidebar-nav button:hover {
-    color: white;
+    background-color: rgba(255, 255, 255, 0.1);
 }
 
 .sidebar-nav button.active {
-    color: white;
-    font-weight: 700;
-    position: relative;
+    background-color: rgba(255, 255, 255, 0.15);
+    border-left-color: var(--white);
+    font-weight: 600;
 }
 
-/* Active indicator - blue bar on right */
+/* Remove the old active indicator */
 .sidebar-nav button.active::after {
-    content: '';
-    position: absolute;
-    right: -16px;
-    /* Stick to right edge of sidebar padding context */
-    top: 50%;
-    transform: translateY(-50%);
-    height: 36px;
-    width: 4px;
-    background: #4318FF;
-    /* Bright blue indicator */
-    border-radius: 4px 0 0 4px;
+    display: none;
 }
 
 .sidebar-footer {
@@ -123,6 +178,7 @@
 /* Main Content Area */
 .admin-main {
     flex: 1;
+    margin-left: 240px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -323,7 +379,7 @@
     }
 
     .admin-sidebar.open {
-        width: 290px;
+        width: 240px;
     }
 }
 

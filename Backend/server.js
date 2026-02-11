@@ -231,4 +231,4 @@ process.on('uncaughtException', (error) => {
 // Démarrer le serveur
 startServer();
 
-module.exports = app;
+module.exports = app;// restart trigger

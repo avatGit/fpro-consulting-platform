@@ -1,10 +1,16 @@
 const maintenanceService = require('../services/maintenanceService');
 const ResponseHandler = require('../utils/responseHandler');
+const socketService = require('../services/socketService');
 
 class MaintenanceController {
     async createRequest(req, res) {
         try {
             const request = await maintenanceService.createRequest(req.userId, req.user.company_id || req.body.companyId, req.body);
+
+            // Notify agents and admins
+            socketService.emitToRole('agent', 'maintenance:new', request);
+            socketService.emitToRole('admin', 'maintenance:new', request);
+
             return ResponseHandler.created(res, request, 'Demande de maintenance créée');
         } catch (error) {
             return ResponseHandler.serverError(res, error);
@@ -72,6 +78,17 @@ class MaintenanceController {
             return ResponseHandler.success(res, technicians, 'Liste des techniciens disponibles récupérée');
         } catch (error) {
             return ResponseHandler.serverError(res, error);
+        }
+    }
+
+    async updateStatus(req, res) {
+        try {
+            const { id } = req.params;
+            const { status } = req.body;
+            const request = await maintenanceService.updateRequestStatus(id, status);
+            return ResponseHandler.success(res, request, 'Statut mis à jour avec succès');
+        } catch (error) {
+            return ResponseHandler.error(res, error.message, 400);
         }
     }
 }

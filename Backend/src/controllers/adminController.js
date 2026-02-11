@@ -30,7 +30,7 @@ class AdminController {
                 Order.sum('total_amount', {
                     where: {
                         status: { [Op.in]: ['delivered'] },
-                        createdAt: {
+                        created_at: {
                             [Op.gte]: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
                         }
                     }
@@ -52,23 +52,23 @@ class AdminController {
             // Commandes récentes (dernières 30 jours)
             const recentOrders = await Order.findAll({
                 where: {
-                    createdAt: {
+                    created_at: {
                         [Op.gte]: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
                     }
                 },
                 attributes: [
-                    [sequelize.fn('DATE', sequelize.col('Order.created_at')), 'date'],
-                    [sequelize.fn('COUNT', sequelize.col('Order.id')), 'count'],
-                    [sequelize.fn('SUM', sequelize.col('Order.total_amount')), 'revenue']
+                    [sequelize.fn('DATE', sequelize.col('created_at')), 'date'],
+                    [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
+                    [sequelize.fn('SUM', sequelize.col('total_amount')), 'revenue']
                 ],
-                group: [sequelize.fn('DATE', sequelize.col('Order.created_at'))],
-                order: [[sequelize.fn('DATE', sequelize.col('Order.created_at')), 'ASC']]
+                group: [sequelize.fn('DATE', sequelize.col('created_at'))],
+                order: [[sequelize.fn('DATE', sequelize.col('created_at')), 'ASC']]
             });
 
             // Nouveaux utilisateurs (derniers 30 jours)
             const newUsersCount = await User.count({
                 where: {
-                    createdAt: {
+                    created_at: {
                         [Op.gte]: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
                     }
                 }
@@ -77,7 +77,7 @@ class AdminController {
             // Commandes récentes pour la liste (non groupées)
             const recentOrdersList = await Order.findAll({
                 limit: 5,
-                order: [['createdAt', 'DESC']],
+                order: [['created_at', 'DESC']],
                 include: [
                     { model: User, as: 'user', attributes: ['first_name', 'last_name'] }
                 ]
@@ -124,7 +124,7 @@ class AdminController {
             // Récupérer les dernières commandes
             const recentOrders = await Order.findAll({
                 limit: parseInt(limit) / 2,
-                order: [['createdAt', 'DESC']],
+                order: [['created_at', 'DESC']],
                 include: [
                     { model: User, as: 'user', attributes: ['first_name', 'last_name'] },
                     { model: Company, as: 'company', attributes: ['name'] }
@@ -134,7 +134,7 @@ class AdminController {
             // Récupérer les dernières demandes de maintenance
             const recentMaintenance = await MaintenanceRequest.findAll({
                 limit: parseInt(limit) / 2,
-                order: [['createdAt', 'DESC']],
+                order: [['created_at', 'DESC']],
                 include: [
                     { model: User, as: 'user', attributes: ['first_name', 'last_name'] }
                 ]
@@ -150,7 +150,7 @@ class AdminController {
                     company: o.company?.name,
                     status: o.status,
                     amount: parseFloat(o.total_amount),
-                    created_at: o.created_at
+                    created_at: o.created_at || o.createdAt
                 })),
                 ...recentMaintenance.map(m => ({
                     type: 'maintenance',
@@ -159,7 +159,7 @@ class AdminController {
                     user: `${m.user?.first_name} ${m.user?.last_name}`,
                     priority: m.priority,
                     status: m.status,
-                    created_at: m.created_at
+                    created_at: m.created_at || m.createdAt
                 }))
             ].sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
                 .slice(0, parseInt(limit));

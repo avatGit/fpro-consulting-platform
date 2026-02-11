@@ -8,6 +8,8 @@ const { syncModels } = require('./models');
 const ResponseHandler = require('./utils/responseHandler');
 const logger = require('./utils/logger');
 const { swaggerUi, specs } = require('./config/swagger');
+const http = require('http');
+const socketService = require('./services/socketService');
 
 // Charger les variables d'environnement
 dotenv.config();
@@ -109,10 +111,12 @@ app.use('/api/orders', orderRoutes);
 const maintenanceRoutes = require('./routes/maintenanceRoutes');
 const interventionRoutes = require('./routes/interventionRoutes');
 const rentalRoutes = require('./routes/rentalRoutes');
+const technicianRoutes = require('./routes/technicianRoutes');
 
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/interventions', interventionRoutes);
 app.use('/api/rentals', rentalRoutes);
+app.use('/api/technicians', technicianRoutes);
 
 // Dashboard & User Routes
 const dashboardRoutes = require('./routes/dashboardRoutes');
@@ -128,11 +132,14 @@ const adminRoutes = require('./routes/adminRoutes');
 const auditRoutes = require('./routes/auditRoutes');
 const invoiceRoutes = require('./routes/invoiceRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 
-app.use('/api/admin', adminRoutes);
-app.use('/api/admin/audit-logs', auditRoutes);
+// Ordre important : les routes spécifiques doivent être définies AVANT la route générique /api/admin
+app.use('/api/admin/audit-logs', auditRoutes); // Shared with agents
 app.use('/api/admin/invoices', invoiceRoutes);
 app.use('/api/admin/settings', settingsRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/admin', adminRoutes); // Generic admin routes (must be last)
 
 // ============================================
 
@@ -199,8 +206,11 @@ const startServer = async () => {
       logger.info('📊 Base de données synchronisée avec succès');
     }
 
-    // 3. Démarrer le serveur Express
-    app.listen(PORT, () => {
+    // 3. Démarrer le serveur HTTP (avec Socket.io)
+    const server = http.createServer(app);
+    socketService.init(server);
+
+    server.listen(PORT, () => {
       logger.info('='.repeat(50));
       logger.info(`🚀 Serveur F-PRO CONSULTING démarré avec succès`);
       logger.info(`📍 URL: http://localhost:${PORT}`);

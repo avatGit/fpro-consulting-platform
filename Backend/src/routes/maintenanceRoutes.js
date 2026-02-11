@@ -14,8 +14,9 @@ router.get('/', maintenanceController.listUserRequests);
 // Routes Admin & Agent
 router.get('/all', authorize('admin', 'agent'), maintenanceController.listAllRequests);
 router.get('/technicians/available', authorize('admin', 'agent'), maintenanceController.listAvailableTechnicians);
-router.post('/:id/assign', authorize('admin', 'agent'), validate(assignTechnicianSchema), maintenanceController.assignTechnician);
-router.post('/:id/auto-assign', authorize('admin', 'agent'), maintenanceController.autoAssign);
+router.post('/:id/assign', authorize('agent'), validate(assignTechnicianSchema), maintenanceController.assignTechnician);
+router.post('/:id/auto-assign', authorize('agent'), maintenanceController.autoAssign);
+router.patch('/:id/status', authorize('agent'), maintenanceController.updateStatus);
 
 router.get('/:id', maintenanceController.getRequest);
 

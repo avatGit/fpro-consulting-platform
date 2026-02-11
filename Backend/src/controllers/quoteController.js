@@ -1,6 +1,8 @@
 const quoteService = require('../services/quoteService');
 const orderService = require('../services/orderService');
 const ResponseHandler = require('../utils/responseHandler');
+const socketService = require('../services/socketService');
+const logger = require('../utils/logger');
 
 class QuoteController {
     async createFromCart(req, res) {
@@ -12,6 +14,17 @@ class QuoteController {
             if (error.message === 'Le panier est vide') {
                 return ResponseHandler.error(res, error.message, 400);
             }
+            return ResponseHandler.serverError(res, error);
+        }
+    }
+
+    async createManually(req, res) {
+        try {
+            const { userId, companyId, items } = req.body;
+            // userId here refers to the CLIENT for whom the agent is creating the quote
+            const quote = await quoteService.createManually(userId, companyId, items);
+            return ResponseHandler.created(res, quote, 'Devis créé manuellement avec succès');
+        } catch (error) {
             return ResponseHandler.serverError(res, error);
         }
     }
@@ -31,10 +44,17 @@ class QuoteController {
 
     async listUserQuotes(req, res) {
         try {
-            // Basic implementation, could be moved to repository with pagination
+            // Only return accepted quotes (those that became orders)
             const { Quote } = require('../models');
-            const quotes = await Quote.findAll({ where: { user_id: req.userId } });
-            return ResponseHandler.success(res, quotes, 'Liste des devis récupérée');
+            const { Op } = require('sequelize');
+            const quotes = await Quote.findAll({
+                where: {
+                    user_id: req.userId,
+                    status: 'accepted'
+                },
+                order: [['created_at', 'DESC']]
+            });
+            return ResponseHandler.success(res, quotes, 'Liste des devis acceptés récupérée');
         } catch (error) {
             return ResponseHandler.serverError(res, error);
         }
@@ -149,6 +169,52 @@ class QuoteController {
             // TODO: Send notification to user with reason
             return ResponseHandler.success(res, quote, 'Devis rejeté');
         } catch (error) {
+            return ResponseHandler.serverError(res, error);
+        }
+    }
+
+    /**
+     * Client accepte son devis et génère une commande
+     */
+    async clientAcceptAndOrder(req, res) {
+        try {
+            const { id } = req.params;
+            logger.info(`[DEBUG] clientAcceptAndOrder: id=${id}, userId=${req.userId}`);
+
+            const quote = await quoteService.getQuoteDetails(id);
+            if (!quote) {
+                logger.warn(`[DEBUG] Quote not found: ${id}`);
+                return ResponseHandler.notFound(res, 'Devis non trouvé');
+            }
+
+            logger.info(`[DEBUG] Quote retrieved: user_id=${quote.user_id}, status=${quote.status}`);
+
+            // Check ownership - Use String conversion to be safe with UUIDs/Strings
+            if (String(quote.user_id) !== String(req.userId)) {
+                logger.warn(`[DEBUG] Ownership mismatch: ${quote.user_id} !== ${req.userId}`);
+                return ResponseHandler.error(res, 'Action non autorisée sur ce devis', 403);
+            }
+
+            if (quote.status !== 'pending' && quote.status !== 'sent') {
+                logger.warn(`[DEBUG] Invalid status: ${quote.status}`);
+                return ResponseHandler.error(res, 'Ce devis ne peut plus être accepté', 400);
+            }
+
+            logger.info(`[DEBUG] Updating status to accepted...`);
+            const updatedQuote = await quoteService.updateStatus(id, 'accepted');
+
+            logger.info(`[DEBUG] Creating order from quote...`);
+            const order = await orderService.createFromQuote(id);
+
+            logger.info(`[DEBUG] Order creation successful: ${order.id}`);
+
+            // Notify agents and admins
+            socketService.emitToRole('agent', 'order:new', order);
+            socketService.emitToRole('admin', 'order:new', order);
+
+            return ResponseHandler.success(res, { quote: updatedQuote, order }, 'Votre commande a été confirmée avec succès');
+        } catch (error) {
+            logger.error('[ERROR] clientAcceptAndOrder failed:', error);
             return ResponseHandler.serverError(res, error);
         }
     }

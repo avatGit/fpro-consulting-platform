@@ -225,6 +225,30 @@ export const autoAssignTechnician = async (requestId) => {
     return response.data;
 };
 
+export const updateMaintenanceStatus = async (requestId, status) => {
+    const response = await api.patch(`/maintenance/${requestId}/status`, { status });
+    return response.data;
+};
+
+// ============================================
+// TECHNICIAN MANAGEMENT
+// ============================================
+
+export const getAllTechnicians = async () => {
+    const response = await api.get('/technicians');
+    return response.data;
+};
+
+export const createTechnician = async (technicianData) => {
+    const response = await api.post('/technicians', technicianData);
+    return response.data;
+};
+
+export const deleteTechnician = async (technicianId) => {
+    const response = await api.delete(`/technicians/${technicianId}`);
+    return response.data;
+};
+
 export default {
     // Dashboard
     getDashboardStats,
@@ -278,5 +302,11 @@ export default {
     // Maintenance
     getAllMaintenanceRequests,
     assignTechnician,
-    autoAssignTechnician
+    autoAssignTechnician,
+    updateMaintenanceStatus,
+
+    // Technicians
+    getAllTechnicians,
+    createTechnician,
+    deleteTechnician
 };

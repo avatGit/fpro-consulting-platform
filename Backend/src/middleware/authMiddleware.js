@@ -98,7 +98,24 @@ const optionalAuth = async (req, res, next) => {
   }
 };
 
+/**
+ * Middleware d'autorisation basé sur les rôles
+ * @param {Array} roles - Liste des rôles autorisés
+ */
+const authorize = (roles = []) => {
+  return (req, res, next) => {
+    const authorizedRoles = Array.isArray(roles) ? roles : [roles];
+
+    if (!req.user || !authorizedRoles.includes(req.userRole)) {
+      return ResponseHandler.forbidden(res, 'Accès non autorisé: Privilèges insuffisants');
+    }
+    next();
+  };
+};
+
 module.exports = {
+  authMiddleware: authenticate,
   authenticate,
-  optionalAuth
+  optionalAuth,
+  authorize
 };

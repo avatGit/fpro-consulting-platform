@@ -11,7 +11,7 @@ function DashboardPage() {
     const [loading, setLoading] = useState(true)
     const [stats, setStats] = useState([
         { id: 1, title: 'Commande en cours', count: 0, color: 'orange' },
-        { id: 2, title: 'Devis en Attente', count: 0, color: 'blue' },
+        { id: 2, title: 'Devis Confirmés', count: 0, color: 'blue' },
         { id: 3, title: 'Intervention en Cours', count: 0, color: 'green' },
         { id: 4, title: 'Factures a Payer', count: 0, color: 'orange' }
     ])
@@ -323,7 +323,7 @@ function DashboardPage() {
 
                     setStats([
                         { id: 1, title: 'Commande en cours', count: counts.ordersInProgress, color: 'orange' },
-                        { id: 2, title: 'Devis en Attente', count: counts.quotesPending, color: 'blue' },
+                        { id: 2, title: 'Devis Confirmés', count: counts.quotesPending, color: 'blue' },
                         { id: 3, title: 'Intervention en Cours', count: counts.interventionsActive, color: 'green' },
                         { id: 4, title: 'Factures a Payer', count: counts.invoicesUnpaid, color: 'orange' }
                     ])
@@ -508,26 +508,48 @@ function DashboardPage() {
         if (cart.length === 0) return;
 
         try {
-            const response = await api.post('/orders/from-cart', { companyId: user.company_id });
-            const rawOrder = response.data.data;
-            const mappedOrder = mapBackendOrderToSuiviState(rawOrder);
+            // Step 1: Generate Quote instead of Order
+            const response = await api.post('/quotes/generate', { companyId: user.company_id });
+            const quote = response.data.data;
 
-            alert('✓ Votre commande a été validée avec succès ! Consultez la section Suivi.');
+            alert('✓ Devis généré avec succès ! Veuillez le valider pour confirmer votre commande.');
 
             // Clear cart
             setCart([]);
 
-            // Refresh orders for Suivi
-            setActiveMenu('suivi');
-            setSelectedOrder(mappedOrder);
+            // Redirect to devis page
+            setActiveMenu('devis');
 
-            // Re-fetch orders to update the list on the left
+            // Select the newly generated quote automatically
+            if (quote.id) {
+                handleSelectQuote(quote.id);
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Erreur lors de la génération du devis. Assurez-vous d'avoir des articles dans le panier.");
+        }
+    }
+
+    const handleConfirmOrderFromQuote = async (quoteId) => {
+        try {
+            const response = await api.post(`/quotes/${quoteId}/client-accept`);
+            const { order } = response.data.data;
+
+            alert('✓ Commande confirmée avec succès ! Consultez la section Suivi.');
+
+            // Redirect to tracking page
+            setActiveMenu('suivi');
+
+            // Re-fetch orders to update the list
             const ordersRes = await api.get('/orders');
             const rawOrders = ordersRes.data.data || [];
             setOrders(rawOrders.map(mapBackendOrderToSuiviState));
+
+            // Clear current devis view
+            setCurrentDevis(null);
         } catch (error) {
             console.error(error);
-            alert("Erreur lors de la validation de la commande. Assurez-vous d'avoir des articles dans le panier.");
+            alert("Erreur lors de la confirmation de la commande.");
         }
     }
 
@@ -786,9 +808,11 @@ function DashboardPage() {
                                                     {activity.number}
                                                 </span>
                                             )}
-                                            <span className={`activity-status status-${activity.statusColor}`}>
-                                                {activity.status}
-                                            </span>
+                                            {activity.type !== 'Devis' && (
+                                                <span className={`activity-status status-${activity.statusColor}`}>
+                                                    {activity.status}
+                                                </span>
+                                            )}
                                             {activity.dateDisplay && <span style={{ fontSize: '0.8em', color: '#666', marginLeft: '10px' }}>{activity.dateDisplay}</span>}
                                         </div>
                                         <button className="details-btn">
@@ -1097,7 +1121,7 @@ function DashboardPage() {
                                     <button className="btn-devis-secondary" onClick={() => handleDownloadPdf(currentDevis.id)}>
                                         Télécharger le PDF
                                     </button>
-                                    <button className="btn-devis-primary" onClick={handlePasserCommande}>
+                                    <button className="btn-devis-primary" onClick={() => handleConfirmOrderFromQuote(currentDevis.id)}>
                                         Valider et Passer la commande
                                     </button>
                                 </div>

@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../services/api'
+import { useSocket } from '../context/SocketContext' // Import Socket Hook
 import Logo from '../components/Logo'
 import './AgentDashboardPage.css'
 
 function AgentDashboardPage() {
     const navigate = useNavigate()
+    const socket = useSocket() // Access socket
     const [activeMenu, setActiveMenu] = useState('dashboard')
     const [loading, setLoading] = useState(true)
 
@@ -14,71 +16,110 @@ function AgentDashboardPage() {
     const [maintenanceRequests, setMaintenanceRequests] = useState([])
     const [technicians, setTechnicians] = useState([])
     const [showTechnicianModal, setShowTechnicianModal] = useState(false)
+    const [showQuoteModal, setShowQuoteModal] = useState(false)
     const [selectedMaintId, setSelectedMaintId] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
 
+    // Manual Quote State
+    const [newQuoteData, setNewQuoteData] = useState({
+        userId: '',
+        companyId: '', // Optional/derived
+        items: [{ product_id: '', quantity: 1, unit_price: 0 }]
+    })
+
     const [stats, setStats] = useState({
         activeRequests: 0,
-        pendingQuotes: 0,
+        acceptedQuotes: 0,
         ordersInProgress: 0,
         urgencies: 0
     })
-    const [auditLogs, setAuditLogs] = useState([])
     const [allInterventions, setAllInterventions] = useState([])
+    const [quotes, setQuotes] = useState([])
+    const [clients, setClients] = useState([])
+    const [rentals, setRentals] = useState([])
 
     useEffect(() => {
         fetchAgentData()
     }, [])
 
+    // Real-time Notifications Listener
+    useEffect(() => {
+        if (socket) {
+            socket.on('order:new', (data) => {
+                // Show notification (for now simple alert, can be improved with toast)
+                // In a real app, use a Toast component
+                alert(`[NOTIF] Nouvelle commande reçue ! N° ${data.order_number}`);
+                fetchAgentData(); // Refresh data
+            });
+
+            socket.on('maintenance:new', (data) => {
+                alert(`[MAINTENANCE] Nouvelle demande de maintenance !`);
+                fetchAgentData(); // Refresh data
+            });
+
+            return () => {
+                socket.off('order:new');
+                socket.off('maintenance:new');
+            }
+        }
+    }, [socket])
+
     const fetchAgentData = async () => {
         setLoading(true)
         try {
-            const [prodRes, orderRes, maintRes, techRes, auditRes, quoteRes] = await Promise.all([
+            const results = await Promise.allSettled([
                 api.get('/products'),
                 api.get('/orders/all'),
                 api.get('/maintenance/all'),
                 api.get('/maintenance/technicians/available'),
-                api.get('/admin/audit-logs'),
-                api.get('/quotes/all/quotes')
+                api.get('/quotes/all/quotes'),
+                api.get('/users/clients'),
+                api.get('/rentals/all')
             ])
 
-            const rawOrders = orderRes.data.data || []
-            const rawMaint = maintRes.data.data || []
-            const rawProds = prodRes.data.data || []
-            const rawTechs = techRes.data.data || []
-            const rawLogs = auditRes.data.data || []
-            const rawQuotes = quoteRes.data.data?.quotes || []
+            const rawProds = results[0].status === 'fulfilled' ? (results[0].value.data?.data || []) : []
+            const rawOrders = results[1].status === 'fulfilled' ? (results[1].value.data?.data || []) : []
+            const rawMaint = results[2].status === 'fulfilled' ? (results[2].value.data?.data || []) : []
+            const rawTechs = results[3].status === 'fulfilled' ? (results[3].value.data?.data || []) : []
+            const rawQuotes = results[4].status === 'fulfilled' ? (results[4].value.data?.data?.quotes || []) : []
+            const rawClients = results[5].status === 'fulfilled' ? (results[5].value.data?.data || []) : []
+            const rawRentals = results[6].status === 'fulfilled' ? (results[6].value.data?.data || []) : []
+
+            if (results[4].status === 'rejected') console.warn('Quotes access denied or failed:', results[4].reason)
 
             setProducts(rawProds)
             setOrders(rawOrders)
             setMaintenanceRequests(rawMaint)
             setTechnicians(rawTechs)
-            setAuditLogs(rawLogs)
+            setQuotes(rawQuotes)
+            setClients(rawClients)
+            setRentals(rawRentals)
+
 
             // Extract all interventions for planning
-            const interventions = rawMaint.reduce((acc, current) => {
+            const interventions = Array.isArray(rawMaint) ? rawMaint.reduce((acc, current) => {
                 if (current.interventions && current.interventions.length > 0) {
                     return [...acc, ...current.interventions.map(i => ({ ...i, request: current }))]
                 }
                 return acc
-            }, [])
+            }, []) : []
             setAllInterventions(interventions)
 
             // Calculate operational stats
             setStats({
-                activeRequests: rawMaint.filter(m => {
+                activeRequests: Array.isArray(rawMaint) ? rawMaint.filter(m => {
                     const status = m.status?.toLowerCase()
                     return status === 'new' || status === 'assigned'
-                }).length,
-                pendingQuotes: rawQuotes.filter(q => q.status === 'pending').length,
-                ordersInProgress: rawOrders.filter(o => {
+                }).length : 0,
+                acceptedQuotes: Array.isArray(rawQuotes) ? rawQuotes.filter(q => q.status === 'accepted').length : 0,
+                ordersInProgress: Array.isArray(rawOrders) ? rawOrders.filter(o => {
                     const status = o.status?.toLowerCase()
                     return status === 'validated' || status === 'processing' || status === 'shipped'
-                }).length,
-                urgencies: rawMaint.filter(m => {
+                }).length : 0,
+                urgencies: Array.isArray(rawMaint) ? rawMaint.filter(m => {
                     const prio = m.priority?.toLowerCase()
                     return prio === 'high' || prio === 'urgent'
-                }).length
+                }).length : 0
             })
 
         } catch (error) {
@@ -97,6 +138,17 @@ function AgentDashboardPage() {
         }
     }
 
+    const handleValidateOrder = async (orderId) => {
+        if (!window.confirm('Valider cette commande ? Cela impactera le stock.')) return;
+        try {
+            await api.post(`/orders/${orderId}/validate`)
+            fetchAgentData()
+            alert('Commande validée avec succès !')
+        } catch (error) {
+            alert(error.response?.data?.message || 'Erreur lors de la validation')
+        }
+    }
+
     const handleAssignTechnician = async (technicianId) => {
         try {
             await api.post(`/maintenance/${selectedMaintId}/assign`, { technicianId })
@@ -108,17 +160,160 @@ function AgentDashboardPage() {
         }
     }
 
+    const handleApproveQuote = async (quoteId) => {
+        if (!window.confirm('Êtes-vous sûr de vouloir approuver ce devis ? Cela générera automatiquement une commande.')) return;
+        try {
+            await api.post(`/quotes/${quoteId}/approve`)
+            fetchAgentData()
+            alert('Devis approuvé et commande générée !')
+        } catch (error) {
+            alert('Erreur lors de l\'approbation')
+        }
+    }
+
+    const handleRejectQuote = async (quoteId) => {
+        const reason = prompt('Veuillez indiquer la raison du rejet :');
+        if (!reason) return;
+        try {
+            await api.post(`/quotes/${quoteId}/reject`, { reason })
+            fetchAgentData()
+            alert('Devis rejeté.')
+        } catch (error) {
+            alert('Erreur lors du rejet')
+        }
+    }
+
+    const handleCancelOrder = async (orderId) => {
+        const reason = prompt('Veuillez indiquer la raison de l\'annulation :');
+        if (!reason) return;
+        try {
+            await api.post(`/orders/${orderId}/cancel`, { reason })
+            fetchAgentData()
+            alert('Commande annulée avec succès.')
+        } catch (error) {
+            alert(error.response?.data?.message || 'Erreur lors de l\'annulation')
+        }
+    }
+
+    const handleConfirmRental = async (rentalId) => {
+        try {
+            await api.patch(`/rentals/${rentalId}/status`, { status: 'confirmed' })
+            fetchAgentData()
+            alert('Location confirmée.')
+        } catch (error) {
+            alert('Erreur lors de la confirmation')
+        }
+    }
+
+    const handleReturnRental = async (rentalId) => {
+        try {
+            await api.patch(`/rentals/${rentalId}/status`, { status: 'returned' })
+            fetchAgentData()
+            alert('Location marquée comme retournée.')
+        } catch (error) {
+            alert('Erreur lors du retour')
+        }
+    }
+
+    const handleUpdateMaintStatus = async (requestId, newStatus) => {
+        try {
+            await api.patch(`/maintenance/${requestId}/status`, { status: newStatus })
+            fetchAgentData()
+            alert('Statut mis à jour !')
+        } catch (error) {
+            alert('Erreur lors de la mise à jour')
+        }
+    }
+
+
+    const handleCreateQuote = async () => {
+        try {
+            // Simplified validation
+            if (!newQuoteData.userId || newQuoteData.items.length === 0) {
+                alert('Veuillez sélectionner un client et au moins un article.')
+                return
+            }
+            // For simplicity, assuming product selection fills price. In real app, selecting product updates unit_price.
+            // Here we just send what we have.
+            await api.post('/quotes/manual', newQuoteData)
+            setShowQuoteModal(false)
+            fetchAgentData()
+            alert('Devis créé avec succès !')
+            setNewQuoteData({ userId: '', companyId: '', items: [{ product_id: '', quantity: 1, unit_price: 0 }] })
+        } catch (error) {
+            console.error(error);
+            alert('Erreur lors de la création du devis')
+        }
+    }
+
+    const handleAddQuoteItem = () => {
+        setNewQuoteData({
+            ...newQuoteData,
+            items: [...newQuoteData.items, { product_id: '', quantity: 1, unit_price: 0 }]
+        })
+    }
+
+    const handleQuoteItemChange = (index, field, value) => {
+        const newItems = [...newQuoteData.items]
+        newItems[index][field] = value
+
+        // Auto-fill price if product changes
+        if (field === 'product_id') {
+            const product = products.find(p => p.id === value)
+            if (product) {
+                newItems[index].unit_price = product.price
+            }
+        }
+
+        setNewQuoteData({ ...newQuoteData, items: newItems })
+    }
+
+    const handleExportOrders = async () => {
+        try {
+            const response = await api.get('/reports/orders', { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `commandes_export_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (error) {
+            console.error('Export error:', error);
+            alert('Erreur lors de l\'export des commandes');
+        }
+    }
+
+    const handleExportMaintenance = async () => {
+        try {
+            const response = await api.get('/reports/maintenance', { responseType: 'blob' });
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `maintenance_export_${new Date().toISOString().split('T')[0]}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        } catch (error) {
+            console.error('Export error:', error);
+            alert('Erreur lors de l\'export des interventions');
+        }
+    }
+
     const handleLogout = () => {
         localStorage.clear()
         navigate('/login')
     }
 
     const menuItems = [
-        { id: 'dashboard', label: 'Dashboard Agent', icon: '📊' },
-        { id: 'orders', label: 'Commandes', icon: '🚚' },
-        { id: 'maintenance', label: 'Interventions', icon: '🔧' },
-        { id: 'planning', label: 'Planning', icon: '📅' },
-        { id: 'history', label: 'Historique', icon: '📜' }
+        { id: 'dashboard', label: 'Tableau de bord', icon: <i className="fa-solid fa-chart-pie"></i> },
+        { id: 'clients', label: 'Clients', icon: <i className="fa-solid fa-users"></i> },
+        { id: 'devis', label: 'Gestion des Devis', icon: <i className="fa-solid fa-file-invoice"></i> },
+        { id: 'orders', label: 'Commandes', icon: <i className="fa-solid fa-shopping-basket"></i> },
+        { id: 'reports', label: 'Rapports', icon: <i className="fa-solid fa-file-export"></i> },
+        { id: 'maintenance', label: 'Interventions', icon: <i className="fa-solid fa-screwdriver-wrench"></i> },
+        { id: 'rentals', label: 'Locations', icon: <i className="fa-solid fa-key"></i> },
+        { id: 'param', label: 'Paramètres', icon: <i className="fa-solid fa-gears"></i> },
     ]
 
     const filteredOrders = orders.filter(o =>
@@ -132,8 +327,8 @@ function AgentDashboardPage() {
     )
 
     if (loading) return (
-        <div className="loading-state" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#F8FAFC' }}>
-            <div className="spinner" style={{ border: '4px solid rgba(0,0,0,0.1)', borderTop: '4px solid #1E3A8A', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite' }}></div>
+        <div className="loading-state" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: '#F4F7FE' }}>
+            <div className="spinner" style={{ border: '4px solid rgba(0,0,0,0.1)', borderTop: '4px solid #4318FF', borderRadius: '50%', width: '48px', height: '48px', animation: 'spin 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite' }}></div>
             <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>
     )
@@ -142,9 +337,12 @@ function AgentDashboardPage() {
         <div className="agent-dashboard-page">
             <aside className="agent-sidebar">
                 <div className="agent-sidebar-header">
-                    <Logo light={true} />
-                    <div className="agent-badge-sidebar">AGENT OPÉRATIONNEL</div>
+                    <div className="sidebar-logo">
+                        <Logo light={true} />
+                    </div>
+                    <div className="agent-badge-sidebar">Interface Opérationnelle</div>
                 </div>
+
                 <nav className="agent-nav">
                     {menuItems.map(item => (
                         <button
@@ -152,14 +350,23 @@ function AgentDashboardPage() {
                             className={`agent-nav-item ${activeMenu === item.id ? 'active' : ''}`}
                             onClick={() => { setActiveMenu(item.id); setSearchTerm(''); }}
                         >
-                            <span className="nav-icon">{item.icon}</span>
+                            <div className="nav-icon-wrapper">{item.icon}</div>
                             <span className="nav-label">{item.label}</span>
+                            <span className="nav-arrow" style={{ opacity: 0.7, fontSize: '1.2rem' }}>›</span>
                         </button>
                     ))}
-                    <div style={{ marginTop: 'auto' }}>
-                        <button className="agent-nav-item" onClick={handleLogout} style={{ color: '#FDA4AF' }}>
-                            <span className="nav-icon">🚪</span>
+
+                    <div style={{ marginTop: 'auto', padding: 'var(--spacing-lg) 0' }}>
+                        <button
+                            className="agent-nav-item"
+                            onClick={handleLogout}
+                            style={{ color: '#FFBABA', background: 'rgba(255, 255, 255, 0.05)' }}
+                        >
+                            <div className="nav-icon-wrapper">
+                                <i className="fa-solid fa-right-from-bracket"></i>
+                            </div>
                             <span className="nav-label">Déconnexion</span>
+                            <span className="nav-arrow" style={{ opacity: 0.7, fontSize: '1.2rem' }}>›</span>
                         </button>
                     </div>
                 </nav>
@@ -167,24 +374,24 @@ function AgentDashboardPage() {
 
             <main className="agent-main">
                 <header className="agent-header">
-                    <h1 className="agent-page-title">{menuItems.find(m => m.id === activeMenu)?.label}</h1>
+                    <div>
+                        <div style={{ fontSize: '14px', color: '#A3AED0', fontWeight: '500', marginBottom: '4px' }}>Pages / {menuItems.find(m => m.id === activeMenu)?.label}</div>
+                        <h1 className="agent-page-title">{menuItems.find(m => m.id === activeMenu)?.label}</h1>
+                    </div>
                     <div className="agent-header-actions">
                         <div className="search-box">
-                            <span className="search-icon">🔍</span>
+                            <span className="search-icon"><i className="fa-solid fa-magnifying-glass"></i></span>
                             <input
                                 type="text"
                                 placeholder="Rechercher..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="search-input-field"
-                                style={{ background: 'transparent', border: 'none', outline: 'none', fontSize: '14px', width: '100%' }}
                             />
                         </div>
                         <div className="user-profile-header" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div className="user-avatar" style={{ border: '2px solid var(--primary-blue-light)' }}>
-                                <div style={{ width: '100%', height: '100%', background: 'var(--gray-100)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold', color: 'var(--primary-blue)' }}>A</div>
-                            </div>
-                            <span className="agent-username">Agent Logistique</span>
+                            <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="Avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #F4F7FE' }} />
+                            <span className="agent-username" style={{ color: '#2B3674', fontWeight: '700' }}>Sébastien Lemaire</span>
                         </div>
                     </div>
                 </header>
@@ -193,88 +400,141 @@ function AgentDashboardPage() {
                     {activeMenu === 'dashboard' && (
                         <>
                             <div className="stats-grid">
-                                <div className="stat-card stat-blue">
-                                    <h3>Demandes Actives</h3>
-                                    <p className="stat-number">{stats.activeRequests}</p>
+                                <div className="stat-card">
+                                    <div className="stat-main-row">
+                                        <div className="stat-icon-wrapper" style={{ color: '#F59E0B' }}>
+                                            <i className="fa-solid fa-clock-rotate-left"></i>
+                                        </div>
+                                        <div className="stat-info">
+                                            <h3>Demandes Actives</h3>
+                                            <div className="stat-number">{stats.activeRequests}</div>
+                                        </div>
+                                    </div>
+                                    <div className="stat-bottom-bar" style={{ background: '#F59E0B' }}></div>
                                 </div>
-                                <div className="stat-card stat-orange">
-                                    <h3>Devis en Attente</h3>
-                                    <p className="stat-number">{stats.pendingQuotes}</p>
+                                <div className="stat-card">
+                                    <div className="stat-main-row">
+                                        <div className="stat-icon-wrapper" style={{ color: '#4318FF' }}>
+                                            <i className="fa-solid fa-file-circle-check"></i>
+                                        </div>
+                                        <div className="stat-info">
+                                            <h3>Devis Confirmés</h3>
+                                            <div className="stat-number">{stats.acceptedQuotes}</div>
+                                        </div>
+                                    </div>
+                                    <div className="stat-bottom-bar" style={{ background: '#4318FF' }}></div>
                                 </div>
-                                <div className="stat-card stat-green">
-                                    <h3>Commandes en Cours</h3>
-                                    <p className="stat-number">{stats.ordersInProgress}</p>
+                                <div className="stat-card">
+                                    <div className="stat-main-row">
+                                        <div className="stat-icon-wrapper" style={{ color: '#01B574' }}>
+                                            <i className="fa-solid fa-truck-fast"></i>
+                                        </div>
+                                        <div className="stat-info">
+                                            <h3>Commandes en Cours</h3>
+                                            <div className="stat-number">{stats.ordersInProgress}</div>
+                                        </div>
+                                    </div>
+                                    <div className="stat-bottom-bar" style={{ background: '#01B574' }}></div>
                                 </div>
-                                <div className="stat-card stat-red">
-                                    <h3>Urgences</h3>
-                                    <p className="stat-number">{stats.urgencies}</p>
+                                <div className="stat-card">
+                                    <div className="stat-main-row">
+                                        <div className="stat-icon-wrapper" style={{ color: '#EE5D50' }}>
+                                            <i className="fa-solid fa-triangle-exclamation"></i>
+                                        </div>
+                                        <div className="stat-info">
+                                            <h3>Urgences</h3>
+                                            <div className="stat-number">{stats.urgencies}</div>
+                                        </div>
+                                    </div>
+                                    <div className="stat-bottom-bar" style={{ background: '#EE5D50' }}></div>
                                 </div>
                             </div>
 
-                            <div className="dashboard-sections" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '24px' }}>
-                                <div className="recent-activity-card" style={{ background: 'white', padding: '24px', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-                                    <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                        <span>🕒</span> Activité Récente
-                                    </h2>
-                                    <div className="agent-table-container">
-                                        <table className="agent-table">
-                                            <thead>
-                                                <tr>
-                                                    <th>Référence</th>
-                                                    <th>Client</th>
-                                                    <th>Type</th>
-                                                    <th>Statut</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {[...orders.map(o => ({ ...o, type: 'Commande' })), ...maintenanceRequests.map(m => ({ ...m, type: 'Maintenance', order_number: m.id.substring(0, 8).toUpperCase() }))]
-                                                    .sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-                                                    .slice(0, 8)
-                                                    .map((item, idx) => (
-                                                        <tr key={idx}>
-                                                            <td><code>{item.order_number}</code></td>
-                                                            <td>{item.user?.first_name} {item.user?.last_name}</td>
-                                                            <td>{item.type}</td>
-                                                            <td><span className={`status-badge status-${item.status?.toLowerCase()}`}>{item.status}</span></td>
-                                                        </tr>
-                                                    ))}
-                                            </tbody>
-                                        </table>
+                            <div className="dashboard-sections" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: '24px' }}>
+                                <div className="dashboard-left-col">
+                                    <div className="recent-activity-card" style={{ background: 'white', padding: '24px', borderRadius: '20px', boxShadow: 'var(--agent-shadow)', marginBottom: '24px' }}>
+                                        <div className="activity-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                            <div style={{ display: 'flex', gap: '20px' }}>
+                                                <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#2B3674' }}>Activité Récente</h2>
+                                                <div className="activity-tabs" style={{ display: 'flex', gap: '16px', fontSize: '12px', fontWeight: '700', color: '#A3AED0' }}>
+                                                    <span style={{ color: '#4318FF', borderBottom: '2px solid #4318FF', paddingBottom: '4px', cursor: 'pointer' }}>Interventions</span>
+                                                    <span style={{ cursor: 'pointer' }}>Situation...</span>
+                                                </div>
+                                            </div>
+                                            <span style={{ fontSize: '13px', color: '#4318FF', cursor: 'pointer', fontWeight: '700' }}>Voir tout</span>
+                                        </div>
+                                        <div className="agent-table-container">
+                                            <table className="agent-table">
+                                                <thead>
+                                                    <tr>
+                                                        <th>Référence</th>
+                                                        <th>Client</th>
+                                                        <th>Type</th>
+                                                        <th>Statut</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {[...orders.map(o => ({ ...o, type: 'Commande' })), ...maintenanceRequests.map(m => ({ ...m, type: 'Maintenance', order_number: m.id.substring(0, 8).toUpperCase() }))]
+                                                        .sort((a, b) => new Date(b.createdAt || b.created_at) - new Date(a.createdAt || a.created_at))
+                                                        .slice(0, 8)
+                                                        .map((item, idx) => (
+                                                            <tr key={idx}>
+                                                                <td><code>{item.order_number}</code></td>
+                                                                <td>{item.user?.first_name} {item.user?.last_name}</td>
+                                                                <td style={{ color: '#A3AED0', fontWeight: '500' }}>{item.type}</td>
+                                                                <td>
+                                                                    <span className={`status-badge status-${item.status?.toLowerCase() === 'pending' || item.status?.toLowerCase() === 'new' ? 'en-attente' : item.status?.toLowerCase() === 'done' || item.status?.toLowerCase() === 'delivered' ? 'termine' : 'en-cours'}`}>
+                                                                        {item.status}
+                                                                    </span>
+                                                                </td>
+                                                            </tr>
+                                                        ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
                                     </div>
                                 </div>
 
-                                <div className="urgency-panel" style={{ background: 'white', padding: '24px', borderRadius: '16px', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}>
-                                    <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '20px' }}>⚠️ Demandes Urgentes</h2>
-                                    <div className="urgency-list" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                                        {maintenanceRequests.filter(r => {
-                                            const prio = r.priority?.toLowerCase()
-                                            return prio === 'high' || prio === 'urgent'
-                                        }).slice(0, 3).map(r => (
-                                            <div key={r.id} style={{ padding: '16px', borderRadius: '12px', background: 'rgba(239, 68, 68, 0.05)', border: '1px solid rgba(239, 68, 68, 0.1)', position: 'relative', overflow: 'hidden' }}>
-                                                <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: '4px', background: 'var(--error)' }}></div>
-                                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                                                    <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--gray-900)' }}>{r.id.substring(0, 8).toUpperCase()}</span>
-                                                    <span style={{ fontSize: '10px', fontWeight: '800', color: 'var(--white)', background: 'var(--error)', padding: '2px 8px', borderRadius: '4px', textTransform: 'uppercase' }}>{r.priority}</span>
+                                <aside className="dashboard-right-col">
+                                    <div className="urgency-panel">
+                                        <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '20px' }}>Demandes Urgentes</h2>
+                                        <div className="urgency-list">
+                                            {maintenanceRequests.filter(r => {
+                                                const prio = r.priority?.toLowerCase()
+                                                return (prio === 'high' || prio === 'urgent') && r.status === 'new'
+                                            }).slice(0, 2).map(r => (
+                                                <div key={r.id} className="urgency-item critique">
+                                                    <div className="urgency-header">
+                                                        <span className="urgency-ref">#{r.id.substring(0, 8).toUpperCase()}</span>
+                                                        <span className="urgency-label" style={{ color: '#EE5D50', background: '#FFF5F4' }}>Critique</span>
+                                                    </div>
+                                                    <p style={{ fontSize: '13px', color: '#707EAE', margin: '4px 0 16px' }}>{r.description?.substring(0, 50)}...</p>
+                                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                        <span style={{ fontSize: '11px', color: '#A3AED0' }}>{new Date(r.createdAt || r.created_at).toLocaleDateString()}</span>
+                                                        <button className="btn-affecter-small" onClick={() => { setSelectedMaintId(r.id); setShowTechnicianModal(true); }}>Affecter</button>
+                                                    </div>
                                                 </div>
-                                                <p style={{ fontSize: '13px', color: 'var(--gray-600)', margin: '8px 0' }}>{r.description?.substring(0, 80)}...</p>
-                                                <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'flex-end' }}>
-                                                    <button className="btn-operational btn-primary-op" style={{ background: 'var(--error)', fontSize: '11px', padding: '6px 12px' }} onClick={() => { setSelectedMaintId(r.id); setShowTechnicianModal(true); }}>Affecter</button>
-                                                </div>
-                                            </div>
-                                        ))}
+                                            ))}
+
+                                            <button style={{ width: '100%', background: '#F4F7FE', border: 'none', padding: '14px', borderRadius: '12px', color: '#4318FF', fontWeight: '800', fontSize: '13px', marginTop: '10px', cursor: 'pointer' }}>
+                                                Historique complet ➡
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                </aside>
                             </div>
                         </>
                     )}
 
                     {activeMenu === 'orders' && (
                         <div className="agent-table-container">
+                            <h3 style={{ marginBottom: '20px', color: '#2B3674' }}>Gestion des Commandes</h3>
                             <table className="agent-table">
                                 <thead>
                                     <tr>
                                         <th>N° Commande</th>
                                         <th>Client</th>
+                                        <th>Date</th>
                                         <th>Statut</th>
                                         <th>Actions</th>
                                     </tr>
@@ -284,23 +544,95 @@ function AgentDashboardPage() {
                                         <tr key={o.id}>
                                             <td><code>{o.order_number}</code></td>
                                             <td>{o.user?.first_name} {o.user?.last_name}</td>
-                                            <td><span className={`status-badge status-${o.status}`}>{o.status}</span></td>
+                                            <td style={{ color: '#A3AED0' }}>{new Date(o.createdAt || o.created_at).toLocaleDateString()}</td>
                                             <td>
+                                                <span className={`status-badge status-${o.status === 'pending' ? 'en-attente' : 'en-cours'}`}>
+                                                    {o.status}
+                                                </span>
+                                            </td>
+                                            <td>
+                                                {o.status !== 'cancelled' && o.status !== 'delivered' && (
+                                                    <button onClick={() => handleCancelOrder(o.id)} style={{ border: 'none', background: '#FFF5F4', color: '#EE5D50', borderRadius: '8px', padding: '6px 12px', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold', marginRight: '8px' }}>
+                                                        Annuler
+                                                    </button>
+                                                )}
                                                 {o.status === 'shipped' && (
-                                                    <button className="btn-operational btn-primary-op" onClick={() => handleUpdateOrderStatus(o.id, 'delivered')}>
+                                                    <button className="btn-operational" onClick={() => handleUpdateOrderStatus(o.id, 'delivered')}>
                                                         Confirmer Livraison
                                                     </button>
                                                 )}
+                                                {o.status === 'pending' && (
+                                                    <button className="btn-operational" onClick={() => handleValidateOrder(o.id)}>
+                                                        Valider Commande
+                                                    </button>
+                                                )}
                                                 {o.status === 'validated' && (
-                                                    <button className="btn-operational btn-primary-op" onClick={() => handleUpdateOrderStatus(o.id, 'processing')}>
+                                                    <button className="btn-operational" onClick={() => handleUpdateOrderStatus(o.id, 'processing')}>
                                                         Démarrer Préparation
                                                     </button>
                                                 )}
                                                 {o.status === 'processing' && (
-                                                    <button className="btn-operational btn-primary-op" onClick={() => handleUpdateOrderStatus(o.id, 'shipped')}>
+                                                    <button className="btn-operational" onClick={() => handleUpdateOrderStatus(o.id, 'shipped')}>
                                                         Marquer Expédiée
                                                     </button>
                                                 )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                    {activeMenu === 'clients' && (
+                        <div className="agent-table-container">
+                            <h3 style={{ marginBottom: '20px', color: '#2B3674' }}>Base Clients</h3>
+                            <table className="agent-table">
+                                <thead>
+                                    <tr>
+                                        <th>Nom</th>
+                                        <th>Email</th>
+                                        <th>Entreprise</th>
+                                        <th>Statut</th>
+                                        <th>Date d'inscription</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {clients.map(client => (
+                                        <tr key={client.id}>
+                                            <td style={{ fontWeight: 'bold' }}>{client.first_name} {client.last_name}</td>
+                                            <td>{client.email}</td>
+                                            <td>{client.company?.name || '-'}</td>
+                                            <td><span className={`status-badge status-${client.is_active ? 'termine' : 'critique'}`}>{client.is_active ? 'Actif' : 'Inactif'}</span></td>
+                                            <td>{new Date(client.createdAt || client.created_at).toLocaleDateString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                    {activeMenu === 'rentals' && (
+                        <div className="agent-table-container">
+                            <h3 style={{ marginBottom: '20px', color: '#2B3674' }}>Gestion des Locations</h3>
+                            <table className="agent-table">
+                                <thead>
+                                    <tr>
+                                        <th>Référence</th>
+                                        <th>Client</th>
+                                        <th>Statut</th>
+                                        <th>Prix Total</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rentals.map(rental => (
+                                        <tr key={rental.id}>
+                                            <td><code>{rental.id.substring(0, 8).toUpperCase()}</code></td>
+                                            <td>{rental.user?.first_name} {rental.user?.last_name}</td>
+                                            <td><span className={`status-badge status-${rental.status === 'active' || rental.status === 'confirmed' ? 'termine' : rental.status === 'returned' ? 'en-attente' : 'critique'}`}>{rental.status}</span></td>
+                                            <td style={{ fontWeight: 'bold' }}>{rental.total_price} €</td>
+                                            <td>
+                                                {rental.status === 'pending' && <button onClick={() => handleConfirmRental(rental.id)} className="btn-operational" style={{ padding: '6px 12px', fontSize: '12px', marginRight: '8px' }}>Confirmer</button>}
+                                                {rental.status === 'active' && <button onClick={() => handleReturnRental(rental.id)} className="btn-operational" style={{ padding: '6px 12px', fontSize: '12px', background: '#FF9F43' }}>Retourné</button>}
                                             </td>
                                         </tr>
                                     ))}
@@ -314,7 +646,7 @@ function AgentDashboardPage() {
                             <table className="agent-table">
                                 <thead>
                                     <tr>
-                                        <th>ID Intervention</th>
+                                        <th>Référence</th>
                                         <th>Client</th>
                                         <th>Priorité</th>
                                         <th>Statut</th>
@@ -327,22 +659,30 @@ function AgentDashboardPage() {
                                             <td><code>{req.id.substring(0, 8).toUpperCase()}</code></td>
                                             <td>{req.user?.first_name} {req.user?.last_name}</td>
                                             <td>
-                                                <span className={`status-badge`} style={{
-                                                    background: (req.priority?.toLowerCase() === 'urgent' || req.priority?.toLowerCase() === 'high') ? 'rgba(239, 68, 68, 0.1)' : 'var(--gray-100)',
-                                                    color: (req.priority?.toLowerCase() === 'urgent' || req.priority?.toLowerCase() === 'high') ? 'var(--error)' : 'var(--gray-600)'
-                                                }}>
+                                                <span className={`status-badge status-${(req.priority?.toLowerCase() === 'urgent' || req.priority?.toLowerCase() === 'high') ? 'critique' : ''}`}>
                                                     {req.priority || 'Normal'}
                                                 </span>
                                             </td>
-                                            <td><span className={`status-badge status-${req.status?.toLowerCase()}`}>{req.status}</span></td>
+                                            <td>
+                                                <span className={`status-badge status-${req.status?.toLowerCase() === 'new' ? 'en-attente' : req.status?.toLowerCase() === 'assigned' ? 'en-attente' : req.status?.toLowerCase() === 'in_progress' ? 'en-cours' : 'termine'}`}>
+                                                    {req.status === 'in_progress' ? 'En Cours' : req.status === 'assigned' ? 'Assigné' : req.status === 'done' ? 'Terminé' : req.status}
+                                                </span>
+                                            </td>
                                             <td>
                                                 {req.status === 'new' && (
-                                                    <button className="btn-operational btn-primary-op" onClick={() => { setSelectedMaintId(req.id); setShowTechnicianModal(true); }}>
+                                                    <button className="btn-operational" onClick={() => { setSelectedMaintId(req.id); setShowTechnicianModal(true); }}>
                                                         Affecter Technicien
                                                     </button>
                                                 )}
                                                 {req.status === 'assigned' && (
-                                                    <span style={{ fontSize: '13px', color: '#64748B', fontStyle: 'italic' }}>Assigné</span>
+                                                    <button className="btn-operational btn-primary-op" onClick={() => handleUpdateMaintStatus(req.id, 'in_progress')}>
+                                                        Démarrer Intervention
+                                                    </button>
+                                                )}
+                                                {req.status === 'in_progress' && (
+                                                    <button className="btn-operational btn-termine-op" onClick={() => handleUpdateMaintStatus(req.id, 'done')} style={{ background: '#01B574', color: 'white' }}>
+                                                        Terminer Intervention
+                                                    </button>
                                                 )}
                                             </td>
                                         </tr>
@@ -352,70 +692,102 @@ function AgentDashboardPage() {
                         </div>
                     )}
 
-                    {activeMenu === 'planning' && (
-                        <div className="planning-view">
-                            <div className="planning-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '20px' }}>
-                                {allInterventions.length > 0 ? Object.entries(
-                                    allInterventions.reduce((groups, intervention) => {
-                                        const date = new Date(intervention.scheduled_at).toLocaleDateString()
-                                        if (!groups[date]) groups[date] = []
-                                        groups[date].push(intervention)
-                                        return groups
-                                    }, {})
-                                ).map(([date, items]) => (
-                                    <div key={date} className="planning-day-card" style={{ background: 'white', borderRadius: '12px', padding: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-                                        <h3 style={{ borderBottom: '2px solid #F1F5F9', paddingBottom: '10px', marginBottom: '15px', color: '#1E3A8A' }}>{date}</h3>
-                                        <div className="day-interventions" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                                            {items.map(item => (
-                                                <div key={item.id} style={{ padding: '10px', borderRadius: '8px', background: '#F8FAFC', borderLeft: '4px solid #3B82F6' }}>
-                                                    <div style={{ fontWeight: '700', fontSize: '14px' }}>{item.request?.subject || 'Intervention'}</div>
-                                                    <div style={{ fontSize: '12px', color: '#64748B' }}>
-                                                        {new Date(item.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {item.status}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
+                    {activeMenu === 'devis' && (
+                        <div className="devis-management-view">
+                            <div className="filter-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '16px 24px', borderRadius: '16px', marginBottom: '24px', boxShadow: 'var(--agent-shadow)', gap: '16px' }}>
+                                <div style={{ display: 'flex', gap: '12px', flex: 1 }}>
+                                    <div className="search-box" style={{ width: '240px' }}>
+                                        <span className="search-icon"><i className="fa-solid fa-magnifying-glass"></i></span>
+                                        <input type="text" placeholder="Recherche ref..." className="search-input-field" />
                                     </div>
-                                )) : (
-                                    <div style={{ textAlign: 'center', gridColumn: '1/-1', padding: '100px', color: '#64748B' }}>Aucune intervention planifiée.</div>
-                                )}
+                                    <select style={{ border: 'none', background: '#F4F7FE', padding: '10px 16px', borderRadius: '12px', color: '#2B3674', fontWeight: 'bold' }}>
+                                        <option>Filtrer par statut</option>
+                                        <option value="pending">En Attente</option>
+                                        <option value="accepted">Accepté</option>
+                                        <option value="refused">Refusé</option>
+                                    </select>
+                                </div>
+                                <button className="btn-operational" onClick={() => setShowQuoteModal(true)} style={{ marginRight: '8px', background: '#4318FF', color: 'white' }}>+ Créer Devis</button>
+                                <button className="btn-operational" onClick={fetchAgentData}>Actualiser</button>
+                            </div>
+                            <div className="agent-table-container">
+                                <table className="agent-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Référence</th>
+                                            <th>Client</th>
+                                            <th>Montant</th>
+                                            <th>Statut</th>
+                                            <th>Date</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {quotes.length > 0 ? quotes.map(quote => (
+                                            <tr key={quote.id}>
+                                                <td><code>{quote.id.substring(0, 8).toUpperCase()}</code></td>
+                                                <td>{quote.user?.first_name} {quote.user?.last_name || 'Client'}</td>
+                                                <td style={{ fontWeight: '700' }}>{quote.total_amount} €</td>
+                                                <td style={{ color: '#A3AED0' }}>{new Date(quote.createdAt || quote.created_at).toLocaleDateString()}</td>
+                                                <td>
+                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                        <a href={`http://localhost:5000/api/quotes/${quote.id}/pdf`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', fontSize: '14px', marginRight: '4px' }} title="Télécharger PDF">
+                                                            <i className="fa-solid fa-file-pdf"></i>
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )) : (
+                                            <tr>
+                                                <td colSpan="6" style={{ textAlign: 'center', padding: '20px', color: '#A3AED0' }}>Aucun devis trouvé</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     )}
 
-                    {activeMenu === 'history' && (
-                        <div className="history-view">
-                            <div className="history-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {auditLogs.length > 0 ? auditLogs.map(log => (
-                                    <div key={log.id} style={{ background: 'white', padding: '16px', borderRadius: '12px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)', display: 'flex', alignItems: 'center', gap: '20px' }}>
-                                        <div className="log-icon" style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px' }}>
-                                            {log.action === 'CREATE' ? '➕' : log.action === 'UPDATE' ? '📝' : log.action === 'DELETE' ? '🗑️' : '🔔'}
-                                        </div>
-                                        <div className="log-details" style={{ flex: 1 }}>
-                                            <div style={{ fontWeight: '700', fontSize: '15px' }}>{log.description || `${log.action} ${log.resource_type}`}</div>
-                                            <div style={{ fontSize: '12px', color: '#64748B' }}>
-                                                {new Date(log.created_at).toLocaleString()} • Par {log.user?.first_name || 'Système'}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )) : (
-                                    <div style={{ textAlign: 'center', padding: '100px', color: '#64748B' }}>Aucun historique disponible.</div>
-                                )}
+
+                    {activeMenu === 'reports' && (
+                        <div className="reports-view" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px' }}>
+                            <div className="report-card" style={{ background: 'white', padding: '32px', borderRadius: '24px', boxShadow: 'var(--agent-shadow)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                                <div style={{ fontSize: '48px', marginBottom: '24px', background: '#F4F7FE', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <i className="fa-solid fa-box-open" style={{ color: '#4318FF' }}></i>
+                                </div>
+                                <h3 style={{ color: '#2B3674', marginBottom: '12px' }}>Export Commandes</h3>
+                                <p style={{ color: '#A3AED0', marginBottom: '24px' }}>Télécharger l'historique complet des commandes au format CSV.</p>
+                                <button className="btn-operational btn-primary-op" onClick={handleExportOrders} style={{ width: '100%', padding: '16px' }}>
+                                    Télécharger CSV
+                                </button>
+                            </div>
+
+                            <div className="report-card" style={{ background: 'white', padding: '32px', borderRadius: '24px', boxShadow: 'var(--agent-shadow)', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center' }}>
+                                <div style={{ fontSize: '48px', marginBottom: '24px', background: '#FFF5F4', width: '80px', height: '80px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <i className="fa-solid fa-screwdriver-wrench" style={{ color: '#EE5D50' }}></i>
+                                </div>
+                                <h3 style={{ color: '#2B3674', marginBottom: '12px' }}>Export Interventions</h3>
+                                <p style={{ color: '#A3AED0', marginBottom: '24px' }}>Télécharger le registre des demandes de maintenance.</p>
+                                <button className="btn-operational btn-secondary-op" onClick={handleExportMaintenance} style={{ width: '100%', padding: '16px', color: '#E02B2B', background: '#FFF5F4' }}>
+                                    Télécharger CSV
+                                </button>
                             </div>
                         </div>
                     )}
                 </div>
-            </main>
+            </main >
 
             {showTechnicianModal && (
-                <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }} onClick={() => setShowTechnicianModal(false)}>
-                    <div className="modal-content" style={{ background: 'white', padding: '32px', borderRadius: '16px', width: '500px', maxWidth: '90%' }} onClick={e => e.stopPropagation()}>
-                        <h2 style={{ fontSize: '20px', fontWeight: '800', marginBottom: '24px', color: '#1E3A8A' }}>Affecter un Technicien</h2>
+                <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100 }} onClick={() => setShowTechnicianModal(false)}>
+                    <div className="modal-content" style={{ background: 'white', padding: '32px', borderRadius: '24px', width: '500px', maxWidth: '90%', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                        <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '24px', color: '#2B3674' }}>Affecter un Technicien</h2>
                         <div className="technician-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '400px', overflowY: 'auto', paddingRight: '12px' }}>
                             {technicians.length > 0 ? technicians.map(tech => (
                                 <div key={tech.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderRadius: '12px', border: '1px solid #E2E8F0', transition: 'all 0.2s' }}>
                                     <div>
-                                        <div style={{ fontWeight: '700', color: '#1E293B' }}>{tech.user?.first_name} {tech.user?.last_name}</div>
+                                        <div style={{ fontWeight: '700', color: '#1E293B' }}>
+                                            {tech.user ? `${tech.user.first_name} ${tech.user.last_name}` : tech.name}
+                                        </div>
                                         <div style={{ fontSize: '12px', color: '#64748B' }}>Charge : {tech.workload} intervention(s)</div>
                                     </div>
                                     <button className="btn-operational btn-primary-op" onClick={() => handleAssignTechnician(tech.id)}>Choisir</button>
@@ -425,12 +797,69 @@ function AgentDashboardPage() {
                             )}
                         </div>
                         <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end' }}>
-                            <button className="btn-operational" onClick={() => setShowTechnicianModal(false)} style={{ background: '#F1F5F9', color: '#64748B' }}>Annuler</button>
+                            <button className="btn-operational btn-secondary-op" onClick={() => setShowTechnicianModal(false)}>Annuler</button>
                         </div>
                     </div>
                 </div>
-            )}
-        </div>
+            )
+            }
+
+            {
+                showQuoteModal && (
+                    <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100 }} onClick={() => setShowQuoteModal(false)}>
+                        <div className="modal-content" style={{ background: 'white', padding: '32px', borderRadius: '24px', width: '600px', maxWidth: '95%', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                            <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '24px', color: '#2B3674' }}>Créer un Devis</h2>
+
+                            <div style={{ marginBottom: '20px' }}>
+                                <label style={{ display: 'block', marginBottom: '8px', color: '#2B3674', fontWeight: '700' }}>Client</label>
+                                <select
+                                    value={newQuoteData.userId}
+                                    onChange={(e) => {
+                                        const client = clients.find(c => c.id === e.target.value);
+                                        setNewQuoteData({ ...newQuoteData, userId: e.target.value, companyId: client?.company_id || '' })
+                                    }}
+                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: '#F4F7FE' }}
+                                >
+                                    <option value="">Sélectionner un client</option>
+                                    {clients.map(client => (
+                                        <option key={client.id} value={client.id}>{client.first_name} {client.last_name} ({client.company?.name || 'Particulier'})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <h3 style={{ fontSize: '16px', color: '#2B3674', marginBottom: '12px' }}>Articles</h3>
+                            {newQuoteData.items.map((item, index) => (
+                                <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
+                                    <select
+                                        value={item.product_id}
+                                        onChange={(e) => handleQuoteItemChange(index, 'product_id', e.target.value)}
+                                        style={{ flex: 2, padding: '10px', borderRadius: '8px', border: '1px solid #E2E8F0' }}
+                                    >
+                                        <option value="">Produit</option>
+                                        {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.price}€)</option>)}
+                                    </select>
+                                    <input
+                                        type="number"
+                                        min="1"
+                                        value={item.quantity}
+                                        onChange={(e) => handleQuoteItemChange(index, 'quantity', parseInt(e.target.value))}
+                                        style={{ width: '60px', padding: '10px', borderRadius: '8px', border: '1px solid #E2E8F0' }}
+                                    />
+                                    <span style={{ fontWeight: 'bold', width: '80px', textAlign: 'right' }}>{(item.unit_price * item.quantity).toFixed(2)}€</span>
+                                </div>
+                            ))}
+
+                            <button onClick={handleAddQuoteItem} style={{ border: 'none', background: 'transparent', color: '#4318FF', fontWeight: '700', cursor: 'pointer', marginBottom: '8px' }}>+ Ajouter un produit</button>
+
+                            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                                <button className="btn-operational btn-secondary-op" onClick={() => setShowQuoteModal(false)}>Annuler</button>
+                                <button className="btn-operational btn-primary-op" onClick={handleCreateQuote} style={{ background: '#4318FF', color: 'white' }}>Créer Devis</button>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+        </div >
     )
 }
 

@@ -64,11 +64,12 @@ router.get('/:id/pdf', quoteController.downloadPdf);
 
 router.get('/:id', quoteController.getQuote);
 router.put('/:id', authorize('admin', 'agent'), quoteController.updateQuote);
+router.post('/:id/client-accept', authorize('client'), quoteController.clientAcceptAndOrder);
 router.patch('/:id/status', validate(updateQuoteStatusSchema), quoteController.updateStatus);
 
 // Admin & Agent routes
 router.get('/all/quotes', authorize('admin', 'agent'), quoteController.listAllQuotes);
-router.post('/:id/approve', authorize('admin', 'agent'), quoteController.approveQuote);
-router.post('/:id/reject', authorize('admin', 'agent'), quoteController.rejectQuote);
+router.post('/:id/approve', authorize('agent'), quoteController.approveQuote);
+router.post('/:id/reject', authorize('agent'), quoteController.rejectQuote);
 
 module.exports = router;

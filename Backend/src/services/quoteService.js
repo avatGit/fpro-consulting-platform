@@ -50,6 +50,96 @@ class QuoteService {
         }
     }
 
+    async createFromOrder(orderId, transaction) {
+        const { Order, OrderItem } = require('../models');
+        const order = await Order.findByPk(orderId, {
+            include: [{ model: OrderItem, as: 'items' }]
+        });
+
+        if (!order) throw new Error('Commande non trouvée');
+
+        const quoteNumber = await quoteRepository.generateQuoteNumber();
+        const vatRate = 18.00;
+        const subtotal = parseFloat(order.total_amount);
+        const vatAmount = subtotal * (vatRate / 100);
+        const totalAmount = subtotal + vatAmount;
+
+        const quoteData = {
+            quote_number: quoteNumber,
+            user_id: order.user_id,
+            company_id: order.company_id,
+            status: 'accepted', // Auto-accepted for direct orders
+            subtotal,
+            vat_rate: vatRate,
+            vat_amount: vatAmount,
+            total_amount: totalAmount,
+            valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        };
+
+        const quoteItems = order.items.map(item => ({
+            product_id: item.product_id,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            subtotal: item.subtotal
+        }));
+
+        const quote = await quoteRepository.createWithItems(quoteData, quoteItems, transaction);
+
+        // Link quote back to order
+        await order.update({ quote_id: quote.id }, { transaction });
+
+        return quote;
+    }
+
+    async createManually(userId, companyId, items) {
+        if (!items || items.length === 0) {
+            throw new Error('Aucun article fourni');
+        }
+
+        const transaction = await sequelize.transaction();
+        try {
+            const quoteNumber = await quoteRepository.generateQuoteNumber();
+            const vatRate = 18.00;
+
+            // Calculate totals
+            let subtotal = 0;
+            const quoteItems = [];
+
+            for (const item of items) {
+                const itemSubtotal = parseFloat(item.unit_price) * parseInt(item.quantity);
+                subtotal += itemSubtotal;
+                quoteItems.push({
+                    product_id: item.product_id,
+                    quantity: item.quantity,
+                    unit_price: item.unit_price,
+                    subtotal: itemSubtotal
+                });
+            }
+
+            const vatAmount = subtotal * (vatRate / 100);
+            const totalAmount = subtotal + vatAmount;
+
+            const quoteData = {
+                quote_number: quoteNumber,
+                user_id: userId,
+                company_id: companyId,
+                status: 'pending',
+                subtotal,
+                vat_rate: vatRate,
+                vat_amount: vatAmount,
+                total_amount: totalAmount,
+                valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            };
+
+            const quote = await quoteRepository.createWithItems(quoteData, quoteItems, transaction);
+            await transaction.commit();
+            return await quoteRepository.findWithDetails(quote.id);
+        } catch (error) {
+            await transaction.rollback();
+            throw error;
+        }
+    }
+
     async updateStatus(quoteId, status) {
         const quote = await quoteRepository.findById(quoteId);
         if (!quote) throw new Error('Devis non trouvé');

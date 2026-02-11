@@ -10,10 +10,26 @@ const Technician = sequelize.define('Technician', {
     user_id: {
         type: DataTypes.UUID,
         unique: true,
-        allowNull: false,
+        allowNull: true,
         references: {
             model: 'users',
             key: 'id'
+        }
+    },
+    name: {
+        type: DataTypes.STRING,
+        allowNull: false,
+        comment: 'Full name for standalone technicians'
+    },
+    phone: {
+        type: DataTypes.STRING,
+        allowNull: true
+    },
+    email: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        validate: {
+            isEmail: true
         }
     },
     skills: {

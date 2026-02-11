@@ -6,7 +6,7 @@
 
 /* Sidebar */
 .admin-sidebar {
-    width: 260px;
+    width: 240px;
     background: linear-gradient(180deg, var(--primary-blue) 0%, var(--primary-blue-dark) 100%);
     position: fixed;
     height: 100vh;
@@ -40,22 +40,26 @@
     flex: 1;
     padding: var(--spacing-lg) 0;
     overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
 }
 
 .admin-nav-item {
     width: 100%;
     display: flex;
     align-items: center;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md) var(--spacing-xl);
+    justify-content: space-between;
+    padding: var(--spacing-md) var(--spacing-xl) !important;
+    margin-bottom: var(--spacing-sm) !important;
     background: none;
     border: none;
-    border-left: 3px solid transparent;
-    color: var(--white);
+    color: #FFFFFF !important;
     font-size: var(--font-size-base);
     font-weight: 500;
     cursor: pointer;
     transition: all var(--transition-fast);
+    border-left: 3px solid transparent;
     text-align: left;
 }
 
@@ -66,8 +70,33 @@
 .admin-nav-item.active {
     background-color: rgba(255, 255, 255, 0.15);
     border-left-color: var(--white);
-    font-weight: 700;
+    font-weight: 600;
 }
+
+.nav-item-content {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    flex: 1;
+}
+
+.nav-icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1rem;
+    opacity: 0.9;
+}
+
+.nav-label {
+    flex: 1;
+}
+
+.nav-arrow {
+    opacity: 0.7;
+    font-size: var(--font-size-xl);
+}
+
 
 .nav-icon {
     font-size: var(--font-size-xl);
@@ -97,7 +126,7 @@
 
 /* Main Content */
 .admin-main {
-    margin-left: 260px;
+    margin-left: 240px;
     flex: 1;
     display: flex;
     flex-direction: column;

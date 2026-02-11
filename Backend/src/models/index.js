@@ -72,8 +72,8 @@ MaintenanceRequest.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
 Company.hasMany(MaintenanceRequest, { foreignKey: 'company_id', as: 'maintenance_requests' });
 MaintenanceRequest.belongsTo(Company, { foreignKey: 'company_id', as: 'company' });
 
-User.hasOne(Technician, { foreignKey: 'user_id', as: 'technician_profile' });
-Technician.belongsTo(User, { foreignKey: 'user_id', as: 'user' });
+User.hasOne(Technician, { foreignKey: 'user_id', as: 'technician_profile', constraints: false });
+Technician.belongsTo(User, { foreignKey: 'user_id', as: 'user', constraints: false });
 
 MaintenanceRequest.hasMany(Intervention, { foreignKey: 'request_id', as: 'interventions' });
 Intervention.belongsTo(MaintenanceRequest, { foreignKey: 'request_id', as: 'request' });

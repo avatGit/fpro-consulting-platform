@@ -25,6 +25,28 @@ class UserController {
     }
 
     /**
+     * Lister les clients (Admin & Agent)
+     */
+    async listClients(req, res) {
+        try {
+            const users = await User.findAll({
+                where: { role: 'client' },
+                attributes: { exclude: ['password_hash'] },
+                include: [{
+                    model: Company,
+                    as: 'company',
+                    attributes: ['id', 'name']
+                }],
+                order: [['created_at', 'DESC']]
+            });
+            return ResponseHandler.success(res, users, 'Liste des clients récupérée');
+        } catch (error) {
+            logger.error('List clients error:', error);
+            return ResponseHandler.serverError(res, error);
+        }
+    }
+
+    /**
      * Mettre à jour un utilisateur (Admin uniquement)
      */
     async updateUser(req, res) {

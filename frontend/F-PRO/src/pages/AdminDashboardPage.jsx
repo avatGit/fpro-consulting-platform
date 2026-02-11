@@ -72,6 +72,10 @@ function AdminDashboardPage() {
     const [maintenanceRequests, setMaintenanceRequests] = useState([]);
     const [maintenanceFilter, setMaintenanceFilter] = useState({ status: '', search: '' });
 
+    // Technicians State (Standalone)
+    const [technicians, setTechnicians] = useState([]);
+    const [showTechnicianModal, setShowTechnicianModal] = useState(false);
+
     // Modals
     const [showUserModal, setShowUserModal] = useState(false);
     const [showQuoteModal, setShowQuoteModal] = useState(false);
@@ -154,11 +158,14 @@ function AdminDashboardPage() {
                 case 'orders':
                     await loadOrders();
                     break;
+                case 'technicians':
+                    await loadTechnicians();
+                    break;
                 case 'products':
                     await loadProducts();
                     break;
                 case 'maintenance':
-                    await Promise.all([loadMaintenance(), loadUsers()]);
+                    await Promise.all([loadMaintenance(), loadUsers(), loadTechnicians()]);
                     break;
                 default:
                     break;
@@ -188,8 +195,12 @@ function AdminDashboardPage() {
     };
 
     const loadUsers = async () => {
-        const response = await adminApi.getAllUsers();
-        setUsers(response.data);
+        try {
+            const response = await adminApi.getAllUsers();
+            setUsers(response.data);
+        } catch (error) {
+            console.error('Error loading users:', error);
+        }
     };
 
     const loadQuotes = async () => {
@@ -214,28 +225,57 @@ function AdminDashboardPage() {
     };
 
     const loadAuditLogs = async () => {
-        const response = await adminApi.getAuditLogs({ ...auditFilter, page: auditPage, limit: 20 });
-        setAuditLogs(response.data.logs || response.data);
+        try {
+            const response = await adminApi.getAuditLogs({ ...auditFilter, page: auditPage, limit: 20 });
+            setAuditLogs(response.data.logs || response.data);
+        } catch (error) {
+            console.error('Error loading audit logs:', error);
+        }
     };
 
     const loadSettings = async () => {
-        const response = await adminApi.getSettings(settingsCategory);
-        setSettings(response.data);
+        try {
+            const response = await adminApi.getSettings(settingsCategory);
+            setSettings(response.data);
+        } catch (error) {
+            console.error('Error loading settings:', error);
+        }
     };
 
     const loadOrders = async () => {
-        const response = await adminApi.getAllOrders(orderFilter);
-        setOrders(response.data);
+        try {
+            const response = await adminApi.getAllOrders(orderFilter);
+            setOrders(response.data);
+        } catch (error) {
+            console.error('Error loading orders:', error);
+        }
     };
 
     const loadProducts = async () => {
-        const response = await api.get('/products');
-        setProducts(response.data.data);
+        try {
+            const response = await api.get('/products');
+            setProducts(response.data.data);
+        } catch (error) {
+            console.error('Error loading products:', error);
+        }
     };
 
     const loadMaintenance = async () => {
-        const response = await adminApi.getAllMaintenanceRequests(maintenanceFilter);
-        setMaintenanceRequests(response.data);
+        try {
+            const response = await adminApi.getAllMaintenanceRequests(maintenanceFilter);
+            setMaintenanceRequests(response.data);
+        } catch (error) {
+            console.error('Error loading maintenance:', error);
+        }
+    };
+
+    const loadTechnicians = async () => {
+        try {
+            const response = await adminApi.getAllTechnicians();
+            setTechnicians(response.data);
+        } catch (error) {
+            console.error('Error loading technicians:', error);
+        }
     };
 
     // Action Handlers
@@ -550,22 +590,9 @@ function AdminDashboardPage() {
                 </div>
 
                 <div className="detail-actions">
-                    {selectedQuote.status === 'pending' && (
-                        <>
-                            <button className="btn btn-danger" onClick={() => {
-                                setShowQuoteModal(false);
-                                handleRejectQuote(selectedQuote.id);
-                            }}>
-                                <i className="fa-solid fa-times"></i> Refuser
-                            </button>
-                            <button className="btn btn-success" onClick={() => {
-                                setShowQuoteModal(false);
-                                handleApproveQuote(selectedQuote.id);
-                            }}>
-                                <i className="fa-solid fa-check"></i> Confirmer
-                            </button>
-                        </>
-                    )}
+                    <p style={{ color: '#A3AED0', fontSize: '13px', fontStyle: 'italic' }}>
+                        Note: Les actions de devis sont gérées par les Agents.
+                    </p>
                 </div>
             </div>
         );
@@ -621,29 +648,18 @@ function AdminDashboardPage() {
                 </div>
 
                 <div className="detail-actions">
-                    {selectedOrder.status === 'pending' && (
-                        <button className="btn btn-primary" onClick={() => {
-                            setShowOrderModal(false);
-                            handleValidateOrder(selectedOrder.id);
-                        }}>
-                            <i className="fa-solid fa-check-double"></i> Valider
-                        </button>
-                    )}
-                    {(selectedOrder.status === 'validated' || selectedOrder.status === 'processing' || selectedOrder.status === 'shipped') && (
-                        <button className="btn btn-success" onClick={() => {
-                            setShowOrderModal(false);
-                            handleUpdateOrderStatus(selectedOrder.id, 'delivered');
-                        }}>
-                            <i className="fa-solid fa-clipboard-check"></i> Terminer la commande
-                        </button>
-                    )}
-                    {(selectedOrder.status === 'delivered') && (
+                    {selectedOrder.status === 'delivered' && (
                         <button className="btn btn-info" onClick={() => {
                             setShowOrderModal(false);
                             handleCreateInvoice(selectedOrder.id);
                         }}>
                             <i className="fa-solid fa-file-invoice"></i> Générer Facture
                         </button>
+                    )}
+                    {(selectedOrder.status !== 'delivered' && selectedOrder.status !== 'cancelled') && (
+                        <p style={{ color: '#A3AED0', fontSize: '13px', fontStyle: 'italic' }}>
+                            Note: Les actions opérationnelles sur les commandes sont gérées par les Agents.
+                        </p>
                     )}
                 </div>
             </div>
@@ -730,49 +746,9 @@ function AdminDashboardPage() {
                 </div>
 
                 <div className="detail-actions">
-                    {selectedMaintenance.status === 'new' && (
-                        <div style={{ display: 'flex', gap: '15px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                            <div className="form-group" style={{ flex: 1, minWidth: '200px' }}>
-                                <label style={{ fontSize: '12px', color: '#A3AED0', marginBottom: '5px', display: 'block' }}>Assigner manuellement un technicien</label>
-                                <select
-                                    className="form-control"
-                                    onChange={(e) => {
-                                        const techId = e.target.value;
-                                        if (techId) {
-                                            showConfirm({
-                                                title: 'Assigner ce technicien ?',
-                                                message: 'Confirmez-vous l\'attribution de cette intervention ?',
-                                                onConfirm: () => handleAssignTechnician(selectedMaintenance.id, techId)
-                                            });
-                                        }
-                                    }}
-                                    defaultValue=""
-                                >
-                                    <option value="" disabled>Choisir un technicien...</option>
-                                    {users.filter(u => u.role === 'technicien').map(tech => (
-                                        <option key={tech.id} value={tech.id}>
-                                            {tech.first_name} {tech.last_name}
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <button className="btn btn-info" onClick={() => {
-                                setShowMaintenanceModal(false);
-                                handleAutoAssignTechnician(selectedMaintenance.id);
-                            }}>
-                                <i className="fa-solid fa-robot"></i> Assignation Auto
-                            </button>
-                        </div>
-                    )}
-                    {selectedMaintenance.status === 'assigned' && (
-                        <button className="btn btn-primary" onClick={() => {
-                            setShowMaintenanceModal(false);
-                            handleUpdateMaintenanceStatus(selectedMaintenance.id, 'in_progress');
-                        }}>
-                            <i className="fa-solid fa-play"></i> Démarrer l'intervention
-                        </button>
-                    )}
+                    <p style={{ color: '#A3AED0', fontSize: '13px', fontStyle: 'italic' }}>
+                        Note: L'affectation des techniciens est gérée par les Agents.
+                    </p>
                 </div>
             </div>
         );
@@ -1004,6 +980,54 @@ function AdminDashboardPage() {
                         <button type="button" className="btn btn-secondary" onClick={onCancel}>Annuler</button>
                         <button type="submit" className="btn btn-primary" style={{ background: '#4318FF', color: 'white', padding: '10px 20px', borderRadius: '10px', fontWeight: '600' }}>
                             {isEditing ? 'Mettre à jour' : 'Créer l\'utilisateur'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        );
+    };
+
+    const TechnicianForm = ({ onCancel, onSave }) => {
+        const [skills, setSkills] = useState('');
+
+        const handleSubmit = (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData.entries());
+            data.skills = skills.split(',').map(s => s.trim()).filter(s => s);
+            onSave(data);
+        };
+
+        return (
+            <div className="admin-form">
+                <form onSubmit={handleSubmit}>
+                    <div className="form-group">
+                        <label>Nom complet</label>
+                        <input name="name" required className="form-control" placeholder="ex: Jean Dupont" />
+                    </div>
+                    <div className="form-row" style={{ display: 'flex', gap: '20px', marginTop: '15px' }}>
+                        <div className="form-group" style={{ flex: 1 }}>
+                            <label>Téléphone</label>
+                            <input name="phone" required className="form-control" placeholder="+221 ..." />
+                        </div>
+                        <div className="form-group" style={{ flex: 1 }}>
+                            <label>Email (Optionnel)</label>
+                            <input name="email" type="email" className="form-control" />
+                        </div>
+                    </div>
+                    <div className="form-group" style={{ marginTop: '15px' }}>
+                        <label>Compétences (séparées par des virgules)</label>
+                        <input
+                            value={skills}
+                            onChange={(e) => setSkills(e.target.value)}
+                            className="form-control"
+                            placeholder="Électricité, Climatisation, Plomberie..."
+                        />
+                    </div>
+                    <div className="form-actions" style={{ marginTop: '25px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                        <button type="button" className="btn btn-secondary" onClick={onCancel}>Annuler</button>
+                        <button type="submit" className="btn btn-primary" style={{ background: '#4318FF', color: 'white', padding: '10px 20px', borderRadius: '10px', fontWeight: '600' }}>
+                            Enregistrer
                         </button>
                     </div>
                 </form>
@@ -1288,10 +1312,6 @@ function AdminDashboardPage() {
             },
             { label: 'Montant', render: (row) => `${parseFloat(row.total_amount || 0).toLocaleString()} FCFA` },
             {
-                label: 'Statut',
-                render: (row) => <Badge text={row.status} variant={getStatusVariant(row.status)} />
-            },
-            {
                 label: 'Date', render: (row) => {
                     const dateVal = row.createdAt || row.created_at;
                     if (!dateVal) return 'N/A';
@@ -1312,22 +1332,6 @@ function AdminDashboardPage() {
                             tooltip="Voir détails"
                             variant="primary"
                         />
-                        {(row.status === 'pending' || row.status === 'draft') && (
-                            <>
-                                <ActionButton
-                                    icon="fa-solid fa-check"
-                                    onClick={() => handleApproveQuote(row.id)}
-                                    tooltip="Confirmer"
-                                    variant="success"
-                                />
-                                <ActionButton
-                                    icon="fa-solid fa-times"
-                                    onClick={() => handleRejectQuote(row.id)}
-                                    tooltip="Refuser"
-                                    variant="danger"
-                                />
-                            </>
-                        )}
                     </div>
                 )
             }
@@ -1378,7 +1382,6 @@ function AdminDashboardPage() {
                                 <FilterDropdown
                                     label="Statut"
                                     options={[
-                                        { value: 'pending', label: 'En attente' },
                                         { value: 'accepted', label: 'Accepté' },
                                         { value: 'refused', label: 'Refusé' }
                                     ]}
@@ -1811,53 +1814,6 @@ function AdminDashboardPage() {
                 label: 'Actions',
                 render: (row) => (
                     <div className="action-buttons">
-                        {/* Validation & Progress */}
-                        {row.status === 'pending' && (
-                            <ActionButton
-                                icon="fa-solid fa-check-circle"
-                                onClick={() => handleValidateOrder(row.id)}
-                                tooltip="Valider (Mettre en cours)"
-                                variant="success"
-                            />
-                        )}
-
-                        {(row.status === 'validated' || row.status === 'processing') && (
-                            <ActionButton
-                                icon="fa-solid fa-clipboard-check"
-                                onClick={() => handleUpdateOrderStatus(row.id, 'delivered')}
-                                tooltip="Terminer la commande"
-                                variant="success"
-                            />
-                        )}
-
-                        {row.status === 'shipped' && (
-                            <ActionButton
-                                icon="fa-solid fa-clipboard-check"
-                                onClick={() => handleUpdateOrderStatus(row.id, 'delivered')}
-                                tooltip="Marquer comme terminé"
-                                variant="success"
-                            />
-                        )}
-
-                        {/* Invoice & Cancel */}
-                        {!row.invoice && row.status === 'delivered' && (
-                            <ActionButton
-                                icon="fa-solid fa-file-invoice"
-                                onClick={() => handleCreateInvoice(row.id)}
-                                tooltip="Créer facture"
-                                variant="success"
-                            />
-                        )}
-                        {row.status === 'pending' && (
-                            <ActionButton
-                                icon="fa-solid fa-times-circle"
-                                onClick={() => handleUpdateOrderStatus(row.id, 'cancelled')}
-                                tooltip="Annuler"
-                                variant="danger"
-                            />
-                        )}
-
-                        {/* View Details */}
                         <ActionButton
                             icon="fa-solid fa-eye"
                             onClick={() => {
@@ -2052,14 +2008,6 @@ function AdminDashboardPage() {
                             tooltip="Voir détails"
                             variant="primary"
                         />
-                        {row.status === 'new' && (
-                            <ActionButton
-                                icon="fa-solid fa-robot"
-                                onClick={() => handleAutoAssignTechnician(row.id)}
-                                tooltip="Assignation auto"
-                                variant="info"
-                            />
-                        )}
                     </div>
                 )
             }
@@ -2096,6 +2044,74 @@ function AdminDashboardPage() {
                         data={filteredMaintenance}
                         loading={loading}
                         emptyMessage="Aucune demande trouvée"
+                    />
+                </div>
+            </div>
+        );
+    };
+
+    const handleDeleteTechnician = async (techId) => {
+        showConfirm({
+            title: 'Supprimer le technicien',
+            message: 'Êtes-vous sûr de vouloir supprimer ce technicien ? Cette action est irréversible.',
+            confirmText: 'Supprimer',
+            type: 'danger',
+            onConfirm: async () => {
+                try {
+                    await adminApi.deleteTechnician(techId);
+                    await loadTechnicians();
+                    addToast('Technicien supprimé', 'success');
+                } catch (error) {
+                    addToast('Erreur lors de la suppression', 'error');
+                }
+            }
+        });
+    };
+
+    const renderTechnicians = () => {
+        const techColumns = [
+            { label: 'Nom', field: 'name' },
+            { label: 'Téléphone', field: 'phone' },
+            { label: 'Email', field: 'email' },
+            {
+                label: 'Compétences',
+                render: (row) => (row.skills || []).map(s => <Badge key={s} text={s} variant="info" style={{ marginRight: '4px' }} />)
+            },
+            {
+                label: 'Actions',
+                render: (row) => (
+                    <div className="action-buttons">
+                        <ActionButton
+                            icon="fa-solid fa-trash"
+                            onClick={() => handleDeleteTechnician(row.id)}
+                            tooltip="Supprimer"
+                            variant="danger"
+                        />
+                    </div>
+                )
+            }
+        ];
+
+        return (
+            <div className="dashboard-container">
+                <div className="dashboard-section card">
+                    <div className="section-header">
+                        <div>
+                            <h2>Gestion des Techniciens Standalone</h2>
+                            <p style={{ color: '#A3AED0', fontSize: '14px', marginTop: '5px' }}>
+                                Techniciens externes sans compte plateforme
+                            </p>
+                        </div>
+                        <button className="btn btn-primary" onClick={() => setShowTechnicianModal(true)}>
+                            <i className="fa-solid fa-plus"></i> Nouveau Technicien
+                        </button>
+                    </div>
+
+                    <DataTable
+                        columns={techColumns}
+                        data={technicians}
+                        loading={loading}
+                        emptyMessage="Aucun technicien trouvé"
                     />
                 </div>
             </div>
@@ -2164,7 +2180,8 @@ function AdminDashboardPage() {
             case 'settings': return 'Paramètres';
             case 'orders': return 'Gestion des Commandes';
             case 'products': return 'Gestion des Stocks';
-            case 'maintenance': return 'Maintenance';
+            case 'maintenance': return 'Interventions Maintenance';
+            case 'technicians': return 'Gestion des Techniciens';
             default: return 'Dashboard';
         }
     };
@@ -2173,74 +2190,127 @@ function AdminDashboardPage() {
         <div className="admin-dashboard">
             {/* Sidebar */}
             <aside className="admin-sidebar">
-                <div className="sidebar-header">
-                    <h2>F-PRO <span style={{ fontWeight: 300 }}>CONSULTING</span></h2>
+                <div className="admin-sidebar-header">
+                    <div className="sidebar-logo">
+                        <Logo light={true} />
+                    </div>
+                    <div className="admin-badge-sidebar">Interface Administrateur</div>
                 </div>
 
-                <div className="sidebar-nav">
+                <nav className="admin-nav">
                     <button
-                        className={activeModule === 'dashboard' ? 'active' : ''}
+                        className={`admin-nav-item ${activeModule === 'dashboard' ? 'active' : ''}`}
                         onClick={() => setActiveModule('dashboard')}
                     >
-                        <i className="fa-solid fa-th-large"></i>
-                        <span>Dashboard Admin</span>
+                        <div className="nav-icon-wrapper">
+                            <i className="fa-solid fa-chart-line"></i>
+                        </div>
+                        <span className="nav-label">Tableau de bord</span>
+                        <span className="nav-arrow">›</span>
                     </button>
 
                     <button
-                        className={activeModule === 'users' ? 'active' : ''}
+                        className={`admin-nav-item ${activeModule === 'users' ? 'active' : ''}`}
                         onClick={() => setActiveModule('users')}
                     >
-                        <i className="fa-solid fa-users"></i>
-                        <span>Utilisateurs</span>
+                        <div className="nav-icon-wrapper">
+                            <i className="fa-solid fa-user-gear"></i>
+                        </div>
+                        <span className="nav-label">Utilisateurs</span>
+                        <span className="nav-arrow">›</span>
                     </button>
 
                     <button
-                        className={activeModule === 'quotes' ? 'active' : ''}
+                        className={`admin-nav-item ${activeModule === 'quotes' ? 'active' : ''}`}
                         onClick={() => setActiveModule('quotes')}
                     >
-                        <i className="fa-solid fa-file-invoice-dollar"></i>
-                        <span>Commandes & Devis</span>
+                        <div className="nav-icon-wrapper">
+                            <i className="fa-solid fa-boxes-stacked"></i>
+                        </div>
+                        <span className="nav-label">Logistique</span>
+                        <span className="nav-arrow">›</span>
                     </button>
 
                     <button
-                        className={activeModule === 'products' ? 'active' : ''}
+                        className={`admin-nav-item ${activeModule === 'invoices' ? 'active' : ''}`}
+                        onClick={() => setActiveModule('invoices')}
+                    >
+                        <div className="nav-icon-wrapper">
+                            <i className="fa-solid fa-file-invoice-dollar"></i>
+                        </div>
+                        <span className="nav-label">Facturation</span>
+                        <span className="nav-arrow">›</span>
+                    </button>
+
+                    <button
+                        className={`admin-nav-item ${activeModule === 'products' ? 'active' : ''}`}
                         onClick={() => setActiveModule('products')}
                     >
-                        <i className="fa-solid fa-box"></i>
-                        <span>Stocks</span>
+                        <div className="nav-icon-wrapper">
+                            <i className="fa-solid fa-box-open"></i>
+                        </div>
+                        <span className="nav-label">Gestion Stocks</span>
+                        <span className="nav-arrow">›</span>
                     </button>
 
                     <button
-                        className={activeModule === 'maintenance' ? 'active' : ''}
+                        className={`admin-nav-item ${activeModule === 'maintenance' ? 'active' : ''}`}
                         onClick={() => setActiveModule('maintenance')}
                     >
-                        <i className="fa-solid fa-tools"></i>
-                        <span>Techniciens</span>
+                        <div className="nav-icon-wrapper">
+                            <i className="fa-solid fa-screwdriver-wrench"></i>
+                        </div>
+                        <span className="nav-label">Interventions</span>
+                        <span className="nav-arrow">›</span>
                     </button>
 
                     <button
-                        className={activeModule === 'audit' ? 'active' : ''}
+                        className={`admin-nav-item ${activeModule === 'technicians' ? 'active' : ''}`}
+                        onClick={() => setActiveModule('technicians')}
+                    >
+                        <div className="nav-icon-wrapper">
+                            <i className="fa-solid fa-user-wrench"></i>
+                        </div>
+                        <span className="nav-label">Techniciens</span>
+                        <span className="nav-arrow">›</span>
+                    </button>
+
+                    <button
+                        className={`admin-nav-item ${activeModule === 'audit' ? 'active' : ''}`}
                         onClick={() => setActiveModule('audit')}
                     >
-                        <i className="fa-solid fa-clipboard-list"></i>
-                        <span>Rapports</span>
+                        <div className="nav-icon-wrapper">
+                            <i className="fa-solid fa-shield-halved"></i>
+                        </div>
+                        <span className="nav-label">Sécurité & Audit</span>
+                        <span className="nav-arrow">›</span>
                     </button>
 
                     <button
-                        className={activeModule === 'settings' ? 'active' : ''}
+                        className={`admin-nav-item ${activeModule === 'settings' ? 'active' : ''}`}
                         onClick={() => setActiveModule('settings')}
                     >
-                        <i className="fa-solid fa-cog"></i>
-                        <span>Paramètres</span>
+                        <div className="nav-icon-wrapper">
+                            <i className="fa-solid fa-sliders"></i>
+                        </div>
+                        <span className="nav-label">Paramètres</span>
+                        <span className="nav-arrow">›</span>
                     </button>
-                </div>
 
-                <div className="sidebar-footer">
-                    <button className="logout-btn" onClick={handleLogout}>
-                        <i className="fa-solid fa-sign-out-alt"></i>
-                        <span>Se déconnecter</span>
-                    </button>
-                </div>
+                    <div style={{ marginTop: 'auto', paddingBottom: 'var(--spacing-xl)' }}>
+                        <button
+                            className="admin-nav-item"
+                            onClick={handleLogout}
+                            style={{ color: '#FFBABA', background: 'rgba(255, 255, 255, 0.05)' }}
+                        >
+                            <div className="nav-icon-wrapper">
+                                <i className="fa-solid fa-right-from-bracket"></i>
+                            </div>
+                            <span className="nav-label">Déconnexion</span>
+                            <span className="nav-arrow">›</span>
+                        </button>
+                    </div>
+                </nav>
             </aside>
 
             {/* Main Content */}
@@ -2301,6 +2371,7 @@ function AdminDashboardPage() {
                             {activeModule === 'orders' && renderOrders()}
                             {activeModule === 'products' && renderProducts()}
                             {activeModule === 'maintenance' && renderMaintenance()}
+                            {activeModule === 'technicians' && renderTechnicians()}
                         </>
                     )}
                 </div>
@@ -2445,6 +2516,29 @@ function AdminDashboardPage() {
                     size="large"
                 >
                     {renderMaintenanceDetails()}
+                </Modal>
+            )}
+
+            {showTechnicianModal && (
+                <Modal
+                    isOpen={true}
+                    title="Nouveau Technicien Standalone"
+                    onClose={() => setShowTechnicianModal(false)}
+                    size="medium"
+                >
+                    <TechnicianForm
+                        onCancel={() => setShowTechnicianModal(false)}
+                        onSave={async (techData) => {
+                            try {
+                                await adminApi.createTechnician(techData);
+                                await loadTechnicians();
+                                setShowTechnicianModal(false);
+                                addToast('Technicien créé avec succès', 'success');
+                            } catch (error) {
+                                addToast(error.response?.data?.message || 'Erreur lors de la création', 'error');
+                            }
+                        }}
+                    />
                 </Modal>
             )}
 

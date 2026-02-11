@@ -1,11 +1,17 @@
 const orderService = require('../services/orderService');
 const ResponseHandler = require('../utils/responseHandler');
+const socketService = require('../services/socketService');
 
 class OrderController {
     async createFromCart(req, res) {
         try {
             const { companyId } = req.body;
             const order = await orderService.createFromCart(req.userId, companyId);
+
+            // Notify agents and admins
+            socketService.emitToRole('agent', 'order:new', order);
+            socketService.emitToRole('admin', 'order:new', order);
+
             return ResponseHandler.created(res, order, 'Commande créée avec succès');
         } catch (error) {
             if (error.message === 'Le panier est vide') {
@@ -19,6 +25,11 @@ class OrderController {
         try {
             const { quoteId } = req.body;
             const order = await orderService.createFromQuote(quoteId);
+
+            // Notify agents and admins
+            socketService.emitToRole('agent', 'order:new', order);
+            socketService.emitToRole('admin', 'order:new', order);
+
             return ResponseHandler.created(res, order, 'Commande créée avec succès');
         } catch (error) {
             if (error.message === 'Devis non trouvé' || error.message === 'Le devis doit être accepté pour créer une commande') {
@@ -79,6 +90,20 @@ class OrderController {
             const order = await orderService.updateStatus(id, status);
             return ResponseHandler.success(res, order, 'Statut de la commande mis à jour');
         } catch (error) {
+            return ResponseHandler.serverError(res, error);
+        }
+    }
+
+    async cancelOrder(req, res) {
+        try {
+            const { id } = req.params;
+            const { reason } = req.body;
+            const order = await orderService.cancelOrder(id, reason);
+            return ResponseHandler.success(res, order, 'Commande annulée avec succès');
+        } catch (error) {
+            if (error.message === 'Commande non trouvée' || error.message.includes('impossible')) {
+                return ResponseHandler.error(res, error.message, 400);
+            }
             return ResponseHandler.serverError(res, error);
         }
     }

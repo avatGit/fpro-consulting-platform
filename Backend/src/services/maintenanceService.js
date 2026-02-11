@@ -86,6 +86,46 @@ class MaintenanceService {
         return await this.assignTechnician(requestId, technician.id);
     }
 
+    async updateRequestStatus(requestId, status) {
+        const request = await maintenanceRequestRepository.findById(requestId);
+        if (!request) throw new Error('Demande de maintenance non trouvée');
+
+        const { Intervention, Technician } = require('../models');
+        const intervention = await Intervention.findOne({ where: { request_id: requestId }, order: [['created_at', 'DESC']] });
+
+        const transaction = await sequelize.transaction();
+        try {
+            // Update request status
+            await request.update({ status: status === 'done' ? 'done' : status }, { transaction });
+
+            // Update associated intervention if it exists
+            if (intervention) {
+                let interventionStatus = status;
+                if (status === 'done') interventionStatus = 'completed';
+
+                const updateData = { status: interventionStatus };
+                if (status === 'in_progress') updateData.started_at = new Date();
+                if (status === 'done') updateData.finished_at = new Date();
+
+                await intervention.update(updateData, { transaction });
+
+                // If completed, decrement technician workload
+                if (status === 'done') {
+                    const technician = await Technician.findByPk(intervention.technician_id);
+                    if (technician && technician.workload > 0) {
+                        await technician.decrement('workload', { by: 1, transaction });
+                    }
+                }
+            }
+
+            await transaction.commit();
+            return await maintenanceRequestRepository.findWithDetails(requestId);
+        } catch (error) {
+            await transaction.rollback();
+            throw error;
+        }
+    }
+
     async getAllRequests() {
         return await maintenanceRequestRepository.findAllWithDetails();
     }
