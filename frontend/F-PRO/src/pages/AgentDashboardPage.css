@@ -57,6 +57,16 @@
     overflow-y: auto;
     display: flex;
     flex-direction: column;
+    /* Hide scrollbar */
+    scrollbar-width: none;
+    /* Firefox */
+    -ms-overflow-style: none;
+    /* IE and Edge */
+}
+
+.agent-nav::-webkit-scrollbar {
+    display: none;
+    /* Chrome, Safari, Opera */
 }
 
 .agent-nav-item {

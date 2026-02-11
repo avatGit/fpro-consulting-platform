@@ -384,24 +384,58 @@ function DashboardPage() {
                     if (!token) return;
 
                     console.log("Fetching Suivi data...");
-                    const [ordersRes, maintenanceRes] = await Promise.allSettled([
+                    const [ordersRes, maintenanceRes, rentalsRes] = await Promise.allSettled([
                         api.get('/orders'),
-                        api.get('/maintenance')
+                        api.get('/maintenance'),
+                        api.get('/rentals/mine')
                     ]);
 
                     let fetchedOrders = [];
                     if (ordersRes.status === 'fulfilled') {
-                        console.log("Orders received:", ordersRes.value.data);
                         const rawOrders = ordersRes.value.data.data || [];
                         fetchedOrders = rawOrders.map(mapBackendOrderToSuiviState);
-                        setOrders(fetchedOrders);
-                    } else {
-                        console.error("Failed to fetch orders:", ordersRes.reason);
+                    }
+
+                    let fetchedRentals = [];
+                    if (rentalsRes.status === 'fulfilled') {
+                        const rawRentals = rentalsRes.value.data.data || [];
+                        fetchedRentals = rawRentals.map(r => {
+                            let statusText = r.status;
+                            let statusValue = 'en-attente';
+                            if (statusText === 'active' || statusText === 'confirmed') {
+                                statusText = 'Confirmé / Actif';
+                                statusValue = 'termine'; // Green
+                            } else if (statusText === 'returned') {
+                                statusText = 'Terminé';
+                                statusValue = 'termine';
+                            } else if (statusText === 'cancelled') {
+                                statusText = 'Annulé / Refusé';
+                                statusValue = 'annule';
+                            }
+
+                            return {
+                                id: r.id,
+                                type: 'Location',
+                                ref: `LOC-${r.id.substring(0, 8).toUpperCase()}`,
+                                status: statusText,
+                                statusClass: statusValue,
+                                date: new Date(r.createdAt || r.created_at).toLocaleDateString('fr-FR'),
+                                sortDate: new Date(r.createdAt || r.created_at),
+                                items: r.items ? r.items.map(i => `${i.quantity}x ${i.product?.name || 'Produit'}`).join(', ') : 'Détails non disponibles',
+                                agent: 'Service Location',
+                                timeline: [
+                                    { label: 'Demande', status: 'completed' },
+                                    { label: 'Validation', status: (statusText === 'pending' ? 'current' : 'completed') },
+                                    { label: 'En cours', status: (['active', 'confirmed', 'returned'].includes(r.status) ? 'current' : 'pending') },
+                                    { label: 'Retour', status: (r.status === 'returned' ? 'completed' : 'pending') }
+                                ],
+                                totalAmount: r.total_price
+                            };
+                        });
                     }
 
                     let fetchedMaintenance = [];
                     if (maintenanceRes.status === 'fulfilled') {
-                        console.log("Maintenance received:", maintenanceRes.value.data);
                         const rawMaint = maintenanceRes.value.data.data || [];
                         fetchedMaintenance = rawMaint.map(req => {
                             let statusText = req.status;
@@ -437,13 +471,10 @@ function DashboardPage() {
                                 ]
                             }
                         });
-                    } else {
-                        console.error("Failed to fetch maintenance:", maintenanceRes.reason);
                     }
 
                     // Merge and sort by raw date objects
-                    const allItems = [...fetchedOrders, ...fetchedMaintenance].sort((a, b) => b.sortDate - a.sortDate);
-                    console.log("Final orders list for UI:", allItems);
+                    const allItems = [...fetchedOrders, ...fetchedMaintenance, ...fetchedRentals].sort((a, b) => b.sortDate - a.sortDate);
                     setOrders(allItems);
 
                 } catch (err) {
@@ -683,32 +714,32 @@ function DashboardPage() {
     ]
     */
 
-    const rentalServices = [
-        {
-            id: 1,
-            name: 'Location imprimante',
-            description: 'Imprimante ultra professionnelle pour tout vos besoin a seuleseulement',
-            price: '90 $',
-            duration: '2 semaines',
-            image: 'https://images.unsplash.com/photo-1612815154858-60aa4c59eaa6?auto=format&fit=crop&w=300&q=80'
-        },
-        {
-            id: 2,
-            name: 'Location Serveur Rack',
-            description: 'Serveur ultra pour tout vos besoin a seuleseulement',
-            price: '90 $',
-            duration: '1 an',
-            image: 'https://images.unsplash.com/photo-1558494949-ef010cbdcc51?auto=format&fit=crop&w=300&q=80'
-        },
-        {
-            id: 3,
-            name: 'Support Technique',
-            description: 'Support technique pour tout besoin de support a seulement',
-            price: '50 $',
-            duration: '2 semaines',
-            image: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=300&q=80'
+    const [rentalServices, setRentalServices] = useState([])
+
+    // ... (rest of the file until useEffect)
+
+    useEffect(() => {
+        // ... (existing activeMenu blocks)
+        if (activeMenu === 'locations') {
+            const fetchRentals = async () => {
+                setLoading(true)
+                try {
+                    const response = await api.get('/products')
+                    const services = response.data.data.filter(p => p.type === 'service')
+                    setRentalServices(services)
+                } catch (err) {
+                    console.error("Error fetching rentals:", err)
+                } finally {
+                    setLoading(false)
+                }
+            }
+            fetchRentals()
         }
-    ];
+        // ...
+    }, [activeMenu])
+
+    // ... (rest of the file including handleRent which is already generic)
+
 
     const getPageTitle = () => {
         const item = menuItems.find(i => i.id === activeMenu)
@@ -845,16 +876,34 @@ function DashboardPage() {
                                                 </div>
                                             </div>
                                             <div className="product-image">
-                                                <img src={product.image} alt={product.name} />
+                                                {product.image_url ? (
+                                                    <img
+                                                        src={`http://localhost:5000${product.image_url}`}
+                                                        alt={product.name}
+                                                        onError={(e) => {
+                                                            e.target.onerror = null;
+                                                            e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI0Y0RjdGRSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iNDgiIGZpbGw9IiM3MDdFQUUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj7wn5OmPC90ZXh0Pjwvc3ZnPg==';
+                                                        }}
+                                                    />
+                                                ) : (
+                                                    <img
+                                                        src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI0Y0RjdGRSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iNDgiIGZpbGw9IiM3MDdFQUUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj7wn5OmPC90ZXh0Pjwvc3ZnPg=="
+                                                        alt={product.name}
+                                                    />
+                                                )}
                                             </div>
                                         </div>
-                                        <button className="btn-add-cart" onClick={() => handleAddToCart(product)}>Ajouter au panier</button>
+                                        <button
+                                            className="add-to-cart-btn"
+                                            onClick={() => handleAddToCart(product)}
+                                        >
+                                            Commander
+                                        </button>
                                     </div>
                                 ))
                             ) : (
-                                <div className="no-products-message" style={{ textAlign: 'center', gridColumn: '1 / -1', padding: '40px', background: '#f8f9fa', borderRadius: '12px' }}>
-                                    <h3>Aucun produit disponible pour le moment</h3>
-                                    <p>Veuillez repasser plus tard ou contacter le support.</p>
+                                <div className="no-products">
+                                    <p>Aucun produit disponible pour le moment.</p>
                                 </div>
                             )}
                         </div>
@@ -929,8 +978,8 @@ function DashboardPage() {
                                     </div>
                                     <p className="rental-desc">{service.description}</p>
                                     <div className="rental-price-row">
-                                        <span className="rental-price">{service.price}/pour</span>
-                                        <span className="rental-duration">{service.duration}</span>
+                                        <span className="rental-price">{Number(service.base_price).toLocaleString('fr-FR')} FCFA/jour</span>
+                                        <span className="rental-duration">Stock: {service.stock_quantity}</span>
                                     </div>
                                     <button className="btn-rent" onClick={() => handleRent(service)}>Louer</button>
                                 </div>

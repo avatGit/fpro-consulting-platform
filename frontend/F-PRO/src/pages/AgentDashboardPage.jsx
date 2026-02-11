@@ -215,6 +215,17 @@ function AgentDashboardPage() {
         }
     }
 
+    const handleRefuseRental = async (rentalId) => {
+        if (!window.confirm('Voulez-vous vraiment refuser cette location ?')) return;
+        try {
+            await api.patch(`/rentals/${rentalId}/status`, { status: 'cancelled' })
+            fetchAgentData()
+            alert('Location refusée (annulée).')
+        } catch (error) {
+            alert('Erreur lors du refus')
+        }
+    }
+
     const handleUpdateMaintStatus = async (requestId, newStatus) => {
         try {
             await api.patch(`/maintenance/${requestId}/status`, { status: newStatus })
@@ -631,7 +642,12 @@ function AgentDashboardPage() {
                                             <td><span className={`status-badge status-${rental.status === 'active' || rental.status === 'confirmed' ? 'termine' : rental.status === 'returned' ? 'en-attente' : 'critique'}`}>{rental.status}</span></td>
                                             <td style={{ fontWeight: 'bold' }}>{rental.total_price} €</td>
                                             <td>
-                                                {rental.status === 'pending' && <button onClick={() => handleConfirmRental(rental.id)} className="btn-operational" style={{ padding: '6px 12px', fontSize: '12px', marginRight: '8px' }}>Confirmer</button>}
+                                                {rental.status === 'pending' && (
+                                                    <>
+                                                        <button onClick={() => handleConfirmRental(rental.id)} className="btn-operational" style={{ padding: '6px 12px', fontSize: '12px', marginRight: '8px' }}>Confirmer</button>
+                                                        <button onClick={() => handleRefuseRental(rental.id)} className="btn-operational" style={{ padding: '6px 12px', fontSize: '12px', background: '#FFF5F4', color: '#EE5D50' }}>Refuser</button>
+                                                    </>
+                                                )}
                                                 {rental.status === 'active' && <button onClick={() => handleReturnRental(rental.id)} className="btn-operational" style={{ padding: '6px 12px', fontSize: '12px', background: '#FF9F43' }}>Retourné</button>}
                                             </td>
                                         </tr>

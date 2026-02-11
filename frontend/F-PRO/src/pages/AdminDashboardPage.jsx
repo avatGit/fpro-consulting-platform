@@ -870,17 +870,78 @@ function AdminDashboardPage() {
 
     const ProductForm = ({ product, onCancel, onSave }) => {
         const isEditing = !!product;
+        const [imagePreview, setImagePreview] = useState(product?.image_url ? `http://localhost:5000${product.image_url}` : null);
+        const [selectedFile, setSelectedFile] = useState(null);
+
+        const handleImageChange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                setSelectedFile(file);
+                const reader = new FileReader();
+                reader.onloadend = () => {
+                    setImagePreview(reader.result);
+                };
+                reader.readAsDataURL(file);
+            }
+        };
 
         const handleSubmit = (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
-            const data = Object.fromEntries(formData.entries());
-            onSave(isEditing ? product.id : null, data);
+
+            // If a new image was selected, add it to FormData
+            if (selectedFile) {
+                formData.set('image', selectedFile);
+            }
+
+            onSave(isEditing ? product.id : null, formData);
         };
 
         return (
             <div className="admin-form">
                 <form onSubmit={handleSubmit}>
+                    {/* Image Upload Section */}
+                    <div className="form-group" style={{ marginBottom: '20px' }}>
+                        <label>Image du produit</label>
+                        <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+                            <div style={{ flex: 1 }}>
+                                <input
+                                    type="file"
+                                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                                    onChange={handleImageChange}
+                                    className="form-control"
+                                    style={{ padding: '8px' }}
+                                />
+                                <small style={{ color: '#707EAE', fontSize: '12px', marginTop: '5px', display: 'block' }}>
+                                    Formats acceptés: JPG, PNG, WEBP (max 5MB)
+                                </small>
+                            </div>
+                            {imagePreview && (
+                                <div style={{
+                                    width: '120px',
+                                    height: '120px',
+                                    border: '2px solid #E9EDF7',
+                                    borderRadius: '12px',
+                                    overflow: 'hidden',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    background: '#F4F7FE'
+                                }}>
+                                    <img
+                                        src={imagePreview}
+                                        alt="Preview"
+                                        style={{
+                                            maxWidth: '100%',
+                                            maxHeight: '100%',
+                                            objectFit: 'cover'
+                                        }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
                     <div className="form-row" style={{ display: 'flex', gap: '20px' }}>
                         <div className="form-group" style={{ flex: 1 }}>
                             <label>Nom du produit</label>

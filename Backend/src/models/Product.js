@@ -39,6 +39,11 @@ const Product = sequelize.define('Product', {
     type: DataTypes.BOOLEAN,
     defaultValue: true
   },
+  image_url: {
+    type: DataTypes.STRING(500),
+    allowNull: true,
+    comment: 'Relative path to product image'
+  },
   created_by: {
     type: DataTypes.UUID,
     allowNull: true

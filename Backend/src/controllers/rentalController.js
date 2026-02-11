@@ -49,6 +49,15 @@ class RentalController {
             return ResponseHandler.serverError(res, error);
         }
     }
+
+    async listUserRentals(req, res) {
+        try {
+            const rentals = await rentalService.listUserRentals(req.userId);
+            return ResponseHandler.success(res, rentals, 'Vos locations récupérées');
+        } catch (error) {
+            return ResponseHandler.serverError(res, error);
+        }
+    }
 }
 
 module.exports = new RentalController();

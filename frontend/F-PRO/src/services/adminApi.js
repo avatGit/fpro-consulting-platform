@@ -192,12 +192,22 @@ export const getAllProducts = async () => {
 };
 
 export const createProduct = async (productData) => {
-    const response = await api.post('/products', productData);
+    // If productData is FormData (contains image), send with multipart/form-data
+    const config = productData instanceof FormData ? {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    } : {};
+
+    const response = await api.post('/products', productData, config);
     return response.data;
 };
 
 export const updateProduct = async (productId, productData) => {
-    const response = await api.put(`/products/${productId}`, productData);
+    // If productData is FormData (contains image), send with multipart/form-data
+    const config = productData instanceof FormData ? {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    } : {};
+
+    const response = await api.put(`/products/${productId}`, productData, config);
     return response.data;
 };
 

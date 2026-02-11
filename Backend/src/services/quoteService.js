@@ -188,6 +188,12 @@ class QuoteService {
         return quote;
     }
 
+    async getAllQuotes() {
+        return await quoteRepository.findAll({
+            order: [['created_at', 'DESC']]
+        });
+    }
+
     async generatePdf(quoteId) {
         const quote = await this.getQuoteDetails(quoteId);
         return await pdfService.generateQuotePdf(quote);

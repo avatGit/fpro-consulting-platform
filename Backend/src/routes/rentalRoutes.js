@@ -63,6 +63,8 @@ router.post('/', validate(createBookingSchema), rentalController.createBooking);
  */
 router.get('/availability', rentalController.checkAvailability);
 
+router.get('/mine', authenticate, rentalController.listUserRentals);
+
 router.post('/:id/confirm', rentalController.confirmBooking);
 
 // Routes Admin & Agent

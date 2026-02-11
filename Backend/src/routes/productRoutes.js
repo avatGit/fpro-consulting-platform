@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const productController = require('../controllers/productController');
 const authMiddleware = require('../middleware/authMiddleware');
+const upload = require('../middleware/uploadMiddleware');
 
 /**
  * @route   GET /api/products
@@ -16,9 +17,9 @@ router.use(authenticate);
 router.get('/', productController.getAllProducts);
 router.get('/:id', productController.getProductById);
 
-// Admin & Agent can create/update
-router.post('/', authorize('admin', 'agent'), productController.createProduct);
-router.put('/:id', authorize('admin', 'agent'), productController.updateProduct);
+// Admin & Agent can create/update (with image upload)
+router.post('/', authorize('admin', 'agent'), upload.single('image'), productController.createProduct);
+router.put('/:id', authorize('admin', 'agent'), upload.single('image'), productController.updateProduct);
 
 // Only Admin can delete
 router.delete('/:id', authorize('admin'), productController.deleteProduct);

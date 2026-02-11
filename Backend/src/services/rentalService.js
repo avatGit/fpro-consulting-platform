@@ -63,6 +63,17 @@ class RentalService {
         return await rentalRepository.findAllWithDetails();
     }
 
+    async listUserRentals(userId) {
+        return await rentalRepository.findAll({
+            where: { user_id: userId },
+            include: [
+                { model: RentalItem, as: 'items', include: [{ model: sequelize.models.Product, as: 'product' }] },
+                { model: sequelize.models.Company, as: 'company' }
+            ],
+            order: [['created_at', 'DESC']]
+        });
+    }
+
     async updateStatus(rentalId, status) {
         const rental = await rentalRepository.findById(rentalId);
         if (!rental) throw new Error('Réservation non trouvée');

@@ -218,6 +218,30 @@ class QuoteController {
             return ResponseHandler.serverError(res, error);
         }
     }
+    /**
+     * Récupérer tous les devis (Admin & Agent)
+     */
+    async listAllQuotes(req, res) {
+        try {
+            const quotes = await quoteService.getAllQuotes();
+            return ResponseHandler.success(res, quotes, 'Liste de tous les devis récupérée');
+        } catch (error) {
+            console.error('Error in listAllQuotes:', error);
+            return ResponseHandler.serverError(res, error);
+        }
+    }
+
+    /**
+     * Télécharger le PDF du devis
+     */
+    async downloadPdf(req, res) {
+        try {
+            const { id } = req.params;
+            return ResponseHandler.error(res, 'Fonctionnalité non implémentée', 501);
+        } catch (error) {
+            return ResponseHandler.serverError(res, error);
+        }
+    }
 }
 
 module.exports = new QuoteController();
