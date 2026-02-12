@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import io from 'socket.io-client';
+import { SERVER_URL } from '../services/api';
 
 const SocketContext = createContext();
 
@@ -12,8 +13,8 @@ export const SocketProvider = ({ children }) => {
         const token = localStorage.getItem('token');
         if (token) {
             // Initialize socket connection
-            // Assuming backend is on localhost:5000 (adjust if env var available)
-            const socketUrl = 'http://localhost:5000';
+            // Socket URL from shared config
+            const socketUrl = SERVER_URL;
 
             const newSocket = io(socketUrl, {
                 query: { token },

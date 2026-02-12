@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import api from '../services/api'
+import api, { SERVER_URL } from '../services/api'
 import { Link, useNavigate } from 'react-router-dom'
 import Logo from '../components/Logo'
 import './DashboardPage.css'
@@ -166,37 +166,6 @@ function DashboardPage() {
         }
     }
 
-    const handleSwitchRole = async (newRole) => {
-        try {
-            const response = await api.put('/auth/update-role', { role: newRole })
-            const { token, user: updatedUser, refreshToken } = response.data.data
-
-            localStorage.setItem('token', token)
-            localStorage.setItem('refreshToken', refreshToken)
-
-            const userName = updatedUser.name ||
-                (updatedUser.first_name && updatedUser.last_name ? `${updatedUser.first_name} ${updatedUser.last_name}` :
-                    updatedUser.first_name || updatedUser.last_name || 'Utilisateur');
-
-            const fullUser = {
-                ...updatedUser,
-                name: userName
-            }
-            setUser(fullUser)
-            localStorage.setItem('user', JSON.stringify(fullUser))
-
-            if (newRole === 'admin' || newRole === 'agent') {
-                localStorage.setItem('isAdmin', 'true')
-                window.location.href = '/admin/dashboard'
-            } else {
-                localStorage.removeItem('isAdmin')
-                alert(`Rôle changé en ${newRole} !`)
-            }
-        } catch (error) {
-            console.error(error)
-            alert('Erreur lors du changement de rôle')
-        }
-    }
 
     const handleLogout = () => {
         localStorage.clear()
@@ -781,12 +750,6 @@ function DashboardPage() {
                     </h1>
 
                     <div className="header-actions">
-                        {!['maintenance', 'retours', 'profile'].includes(activeMenu) && (
-                            <div className="search-box">
-                                <span className="search-icon">🔍</span>
-                                <span className="search-text">{user.role === 'client' ? 'Rechercher un produit...' : 'Recherche...'}</span>
-                            </div>
-                        )}
 
                         <button className="notification-btn">
                             <span className="bell-icon">🔔</span>
@@ -878,7 +841,7 @@ function DashboardPage() {
                                             <div className="product-image">
                                                 {product.image_url ? (
                                                     <img
-                                                        src={`http://localhost:5000${product.image_url}`}
+                                                        src={`${SERVER_URL}${product.image_url}`}
                                                         alt={product.name}
                                                         onError={(e) => {
                                                             e.target.onerror = null;
@@ -974,7 +937,21 @@ function DashboardPage() {
                                 <div key={service.id} className="rental-card">
                                     <h3 className="rental-name">{service.name}</h3>
                                     <div className="rental-image">
-                                        <img src={service.image} alt={service.name} />
+                                        {service.image_url ? (
+                                            <img
+                                                src={`${SERVER_URL}${service.image_url}`}
+                                                alt={service.name}
+                                                onError={(e) => {
+                                                    e.target.onerror = null;
+                                                    e.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI0Y0RjdGRSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iNDgiIGZpbGw9IiM3MDdFQUUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj7wn5OmPC90ZXh0Pjwvc3ZnPg==';
+                                                }}
+                                            />
+                                        ) : (
+                                            <img
+                                                src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI0Y0RjdGRSIvPjx0ZXh0IHg9IjUwJSIgeT0iNTAlIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iNDgiIGZpbGw9IiM3MDdFQUUiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGR5PSIuM2VtIj7wn5OmPC90ZXh0Pjwvc3ZnPg=="
+                                                alt={service.name}
+                                            />
+                                        )}
                                     </div>
                                     <p className="rental-desc">{service.description}</p>
                                     <div className="rental-price-row">
@@ -1432,25 +1409,6 @@ function DashboardPage() {
                                                 <p>Sécurisez votre compte avec un mot de passe fort</p>
                                             </div>
                                             <button className="btn-outline-small" onClick={() => setShowPasswordModal(true)}>Changer</button>
-                                        </div>
-                                        {/* Demo Role Switching */}
-                                        <div className="security-item" style={{ background: '#f0f9ff', border: '1px solid #bae6fd' }}>
-                                            <div className="sec-info">
-                                                <h4 style={{ color: '#0369a1' }}>Mode Développeur / Demo</h4>
-                                                <p style={{ color: '#0c4a6e' }}>Changer de rôle pour tester les différentes vues</p>
-                                            </div>
-                                            <div style={{ display: 'flex', gap: '5px' }}>
-                                                <select
-                                                    className="pref-select"
-                                                    value={user.role}
-                                                    onChange={(e) => handleSwitchRole(e.target.value)}
-                                                >
-                                                    <option value="client">Client</option>
-                                                    <option value="admin">Admin</option>
-                                                    <option value="agent">Agent</option>
-                                                    <option value="technicien">Technicien</option>
-                                                </select>
-                                            </div>
                                         </div>
                                     </div>
                                 </div>

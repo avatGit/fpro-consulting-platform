@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import api from '../services/api'
+import api, { SERVER_URL } from '../services/api'
 import { useSocket } from '../context/SocketContext' // Import Socket Hook
 import Logo from '../components/Logo'
+import RentalForm from '../components/RentalForm'
 import './AgentDashboardPage.css'
 
 function AgentDashboardPage() {
@@ -19,6 +20,8 @@ function AgentDashboardPage() {
     const [showQuoteModal, setShowQuoteModal] = useState(false)
     const [selectedMaintId, setSelectedMaintId] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
+    const [showRentalModal, setShowRentalModal] = useState(false)
+    const [editingRental, setEditingRental] = useState(null)
 
     // Manual Quote State
     const [newQuoteData, setNewQuoteData] = useState({
@@ -226,6 +229,16 @@ function AgentDashboardPage() {
         }
     }
 
+    const handleDeliverRental = async (rentalId) => {
+        try {
+            await api.patch(`/rentals/${rentalId}/status`, { status: 'active' })
+            fetchAgentData()
+            alert('Location marquée comme livrée (active).')
+        } catch (error) {
+            alert('Erreur lors de la livraison')
+        }
+    }
+
     const handleUpdateMaintStatus = async (requestId, newStatus) => {
         try {
             await api.patch(`/maintenance/${requestId}/status`, { status: newStatus })
@@ -311,6 +324,33 @@ function AgentDashboardPage() {
         }
     }
 
+    const handleCreateRental = async (rentalData) => {
+        try {
+            const formData = new FormData();
+            Object.keys(rentalData).forEach(key => {
+                if (key === 'image' && rentalData[key]) {
+                    formData.append('image', rentalData[key]);
+                } else if (key !== 'type') { // Skip type if it exists, we force it below
+                    formData.append(key, rentalData[key]);
+                }
+            });
+            // Force type to 'service' for rentals
+            formData.append('type', 'service');
+
+            await api.post('/products', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+
+            alert('Produit de location ajouté avec succès');
+            setShowRentalModal(false);
+            fetchAgentData(); // Refresh data to see the new product/service if needed
+        } catch (error) {
+            console.error('Error creating rental product:', error);
+            const errorMessage = error.response?.data?.message || error.message || 'Erreur inconnue';
+            alert(`Erreur lors de la création du produit: ${errorMessage}`);
+        }
+    };
+
     const handleLogout = () => {
         localStorage.clear()
         navigate('/login')
@@ -390,16 +430,6 @@ function AgentDashboardPage() {
                         <h1 className="agent-page-title">{menuItems.find(m => m.id === activeMenu)?.label}</h1>
                     </div>
                     <div className="agent-header-actions">
-                        <div className="search-box">
-                            <span className="search-icon"><i className="fa-solid fa-magnifying-glass"></i></span>
-                            <input
-                                type="text"
-                                placeholder="Rechercher..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="search-input-field"
-                            />
-                        </div>
                         <div className="user-profile-header" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                             <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="Avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #F4F7FE' }} />
                             <span className="agent-username" style={{ color: '#2B3674', fontWeight: '700' }}>Sébastien Lemaire</span>
@@ -623,7 +653,19 @@ function AgentDashboardPage() {
                     )}
                     {activeMenu === 'rentals' && (
                         <div className="agent-table-container">
-                            <h3 style={{ marginBottom: '20px', color: '#2B3674' }}>Gestion des Locations</h3>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                                <h3 style={{ color: '#2B3674', margin: 0 }}>Gestion des Locations</h3>
+                                <button
+                                    className="btn-operational"
+                                    style={{ background: '#4318FF', color: 'white' }}
+                                    onClick={() => {
+                                        setEditingRental(null);
+                                        setShowRentalModal(true);
+                                    }}
+                                >
+                                    <i className="fa-solid fa-plus"></i> Ajouter produit de location
+                                </button>
+                            </div>
                             <table className="agent-table">
                                 <thead>
                                     <tr>
@@ -647,6 +689,9 @@ function AgentDashboardPage() {
                                                         <button onClick={() => handleConfirmRental(rental.id)} className="btn-operational" style={{ padding: '6px 12px', fontSize: '12px', marginRight: '8px' }}>Confirmer</button>
                                                         <button onClick={() => handleRefuseRental(rental.id)} className="btn-operational" style={{ padding: '6px 12px', fontSize: '12px', background: '#FFF5F4', color: '#EE5D50' }}>Refuser</button>
                                                     </>
+                                                )}
+                                                {rental.status === 'confirmed' && (
+                                                    <button onClick={() => handleDeliverRental(rental.id)} className="btn-operational" style={{ padding: '6px 12px', fontSize: '12px', background: '#01B574', color: 'white' }}>Livrer</button>
                                                 )}
                                                 {rental.status === 'active' && <button onClick={() => handleReturnRental(rental.id)} className="btn-operational" style={{ padding: '6px 12px', fontSize: '12px', background: '#FF9F43' }}>Retourné</button>}
                                             </td>
@@ -747,7 +792,7 @@ function AgentDashboardPage() {
                                                 <td style={{ color: '#A3AED0' }}>{new Date(quote.createdAt || quote.created_at).toLocaleDateString()}</td>
                                                 <td>
                                                     <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                        <a href={`http://localhost:5000/api/quotes/${quote.id}/pdf`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', fontSize: '14px', marginRight: '4px' }} title="Télécharger PDF">
+                                                        <a href={`${SERVER_URL}/api/quotes/${quote.id}/pdf`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', fontSize: '14px', marginRight: '4px' }} title="Télécharger PDF">
                                                             <i className="fa-solid fa-file-pdf"></i>
                                                         </a>
                                                     </div>
@@ -875,7 +920,20 @@ function AgentDashboardPage() {
                     </div>
                 )
             }
-        </div >
+
+            {showRentalModal && (
+                <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100 }} onClick={() => setShowRentalModal(false)}>
+                    <div className="modal-content" style={{ background: 'white', padding: '32px', borderRadius: '24px', width: '600px', maxWidth: '95%', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
+                        <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '24px', color: '#2B3674' }}>{editingRental ? 'Modifier produit de location' : 'Nouveau produit de location'}</h2>
+                        <RentalForm
+                            product={editingRental}
+                            onCancel={() => setShowRentalModal(false)}
+                            onSave={(id, data) => handleCreateRental(data)}
+                        />
+                    </div>
+                </div>
+            )}
+        </div>
     )
 }
 

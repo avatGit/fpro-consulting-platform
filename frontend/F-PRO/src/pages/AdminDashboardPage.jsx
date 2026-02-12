@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import api, { SERVER_URL } from '../services/api';
 import adminApi from '../services/adminApi';
 import Logo from '../components/Logo';
+import '../styles/Forms.css';
 import {
     StatCard,
     DataTable,
@@ -870,7 +871,7 @@ function AdminDashboardPage() {
 
     const ProductForm = ({ product, onCancel, onSave }) => {
         const isEditing = !!product;
-        const [imagePreview, setImagePreview] = useState(product?.image_url ? `http://localhost:5000${product.image_url}` : null);
+        const [imagePreview, setImagePreview] = useState(product?.image_url ? `${SERVER_URL}${product.image_url}` : null);
         const [selectedFile, setSelectedFile] = useState(null);
 
         const handleImageChange = (e) => {
@@ -889,7 +890,6 @@ function AdminDashboardPage() {
             e.preventDefault();
             const formData = new FormData(e.target);
 
-            // If a new image was selected, add it to FormData
             if (selectedFile) {
                 formData.set('image', selectedFile);
             }
@@ -898,94 +898,98 @@ function AdminDashboardPage() {
         };
 
         return (
-            <div className="admin-form">
+            <div className="premium-form-container animate-fade-in shadow-none p-0 bg-transparent">
                 <form onSubmit={handleSubmit}>
                     {/* Image Upload Section */}
-                    <div className="form-group" style={{ marginBottom: '20px' }}>
-                        <label>Image du produit</label>
-                        <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
-                            <div style={{ flex: 1 }}>
+                    <div className="form-section">
+                        <label className="form-group-label">Image du produit</label>
+                        {!imagePreview ? (
+                            <div className="premium-upload-zone" onClick={() => document.getElementById('admin-product-image').click()}>
                                 <input
                                     type="file"
+                                    id="admin-product-image"
                                     accept="image/jpeg,image/jpg,image/png,image/webp"
                                     onChange={handleImageChange}
-                                    className="form-control"
-                                    style={{ padding: '8px' }}
+                                    style={{ display: 'none' }}
                                 />
-                                <small style={{ color: '#707EAE', fontSize: '12px', marginTop: '5px', display: 'block' }}>
-                                    Formats acceptés: JPG, PNG, WEBP (max 5MB)
-                                </small>
-                            </div>
-                            {imagePreview && (
-                                <div style={{
-                                    width: '120px',
-                                    height: '120px',
-                                    border: '2px solid #E9EDF7',
-                                    borderRadius: '12px',
-                                    overflow: 'hidden',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    background: '#F4F7FE'
-                                }}>
-                                    <img
-                                        src={imagePreview}
-                                        alt="Preview"
-                                        style={{
-                                            maxWidth: '100%',
-                                            maxHeight: '100%',
-                                            objectFit: 'cover'
-                                        }}
-                                    />
+                                <div className="upload-icon">
+                                    <i className="fa-solid fa-cloud-upload-alt"></i>
                                 </div>
-                            )}
+                                <div className="upload-text">Cliquez pour télécharger une image</div>
+                                <div className="upload-hint">JPG, PNG, WEBP (max 5MB)</div>
+                            </div>
+                        ) : (
+                            <div className="premium-preview-container">
+                                <img src={imagePreview} alt="Preview" />
+                                <button
+                                    className="premium-btn premium-btn-danger"
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        setImagePreview(null);
+                                        setSelectedFile(null);
+                                    }}
+                                    style={{
+                                        position: 'absolute',
+                                        top: '10px',
+                                        right: '10px',
+                                        padding: '8px 12px',
+                                        borderRadius: '10px',
+                                        fontSize: '12px'
+                                    }}
+                                >
+                                    <i className="fa-solid fa-trash"></i> Retirer
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="form-section">
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '16px' }}>
+                            <div className="form-group">
+                                <label className="form-group-label">Nom du produit</label>
+                                <input name="name" defaultValue={product?.name} required className="premium-input" placeholder="Ex: Vidéoprojecteur" />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-group-label">SKU</label>
+                                <input name="sku" defaultValue={product?.sku} required className="premium-input" placeholder="Ex: PROD-001" />
+                            </div>
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '16px' }}>
+                            <div className="form-group">
+                                <label className="form-group-label">Type de produit</label>
+                                <select name="type" defaultValue={product?.type || 'product'} className="premium-input">
+                                    <option value="product">Produit physique</option>
+                                    <option value="service">Service / Forfait</option>
+                                </select>
+                            </div>
+                            <div className="form-group">
+                                <label className="form-group-label">Prix de base (FCFA)</label>
+                                <input name="base_price" type="number" step="0.01" defaultValue={product?.base_price} required className="premium-input" />
+                            </div>
+                        </div>
+
+                        <div className="form-group mb-4">
+                            <label className="form-group-label">Description</label>
+                            <textarea name="description" defaultValue={product?.description} className="premium-textarea" rows="3" placeholder="Caractéristiques et détails..." />
+                        </div>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                            <div className="form-group">
+                                <label className="form-group-label">Quantité en stock</label>
+                                <input name="stock_quantity" type="number" defaultValue={product?.stock_quantity || 0} required className="premium-input" />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-group-label">Seuil d'alerte (Stock bas)</label>
+                                <input name="min_threshold" type="number" defaultValue={product?.min_threshold || 5} required className="premium-input" />
+                            </div>
                         </div>
                     </div>
 
-                    <div className="form-row" style={{ display: 'flex', gap: '20px' }}>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label>Nom du produit</label>
-                            <input name="name" defaultValue={product?.name} required className="form-control" />
-                        </div>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label>SKU</label>
-                            <input name="sku" defaultValue={product?.sku} required className="form-control" />
-                        </div>
-                    </div>
-
-                    <div className="form-row" style={{ display: 'flex', gap: '20px', marginTop: '15px' }}>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label>Type</label>
-                            <select name="type" defaultValue={product?.type || 'product'} className="form-control" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #E9EDF7' }}>
-                                <option value="product">Produit physique</option>
-                                <option value="service">Service / Forfait</option>
-                            </select>
-                        </div>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label>Prix de base (FCFA)</label>
-                            <input name="base_price" type="number" step="0.01" defaultValue={product?.base_price} required className="form-control" />
-                        </div>
-                    </div>
-
-                    <div className="form-group" style={{ marginTop: '15px' }}>
-                        <label>Description</label>
-                        <textarea name="description" defaultValue={product?.description} className="form-control" rows="3" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #E9EDF7' }}></textarea>
-                    </div>
-
-                    <div className="form-row" style={{ display: 'flex', gap: '20px', marginTop: '15px' }}>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label>Quantité en stock</label>
-                            <input name="stock_quantity" type="number" defaultValue={product?.stock_quantity || 0} required className="form-control" />
-                        </div>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label>Seuil d'alerte</label>
-                            <input name="min_threshold" type="number" defaultValue={product?.min_threshold || 5} required className="form-control" />
-                        </div>
-                    </div>
-
-                    <div className="form-actions" style={{ marginTop: '25px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                        <button type="button" className="btn btn-secondary" onClick={onCancel}>Annuler</button>
-                        <button type="submit" className="btn btn-primary" style={{ background: '#4318FF', color: 'white', padding: '10px 20px', borderRadius: '10px', fontWeight: '600' }}>
+                    <div className="form-actions mt-4" style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
+                        <button type="button" onClick={onCancel} className="premium-btn premium-btn-secondary">Annuler</button>
+                        <button type="submit" className="premium-btn premium-btn-primary">
+                            <i className="fa-solid fa-check"></i>
                             {isEditing ? 'Mettre à jour' : 'Ajouter au catalogue'}
                         </button>
                     </div>
@@ -997,49 +1001,52 @@ function AdminDashboardPage() {
     const UserForm = ({ user, onCancel, onSave }) => {
         const isEditing = !!user;
         return (
-            <div className="user-form-container">
-                <form className="admin-form" onSubmit={(e) => {
+            <div className="premium-form-container animate-fade-in shadow-none p-0 bg-transparent">
+                <form onSubmit={(e) => {
                     e.preventDefault();
                     const formData = new FormData(e.target);
                     const userData = Object.fromEntries(formData.entries());
                     onSave(isEditing ? user.id : null, userData);
                 }}>
-                    <div className="form-row" style={{ display: 'flex', gap: '15px' }}>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label>Prénom</label>
-                            <input name="first_name" defaultValue={user?.first_name} required className="form-control" />
+                    <div className="form-section">
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '16px' }}>
+                            <div className="form-group">
+                                <label className="form-group-label">Prénom</label>
+                                <input name="first_name" defaultValue={user?.first_name} required className="premium-input" placeholder="Prénom" />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-group-label">Nom</label>
+                                <input name="last_name" defaultValue={user?.last_name} required className="premium-input" placeholder="Nom" />
+                            </div>
                         </div>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label>Nom</label>
-                            <input name="last_name" defaultValue={user?.last_name} required className="form-control" />
+
+                        <div className="form-group mb-4">
+                            <label className="form-group-label">Email Professionnel</label>
+                            <input name="email" type="email" defaultValue={user?.email} required className="premium-input" placeholder="email@exemple.com" />
+                        </div>
+
+                        {!isEditing && (
+                            <div className="form-group mb-4">
+                                <label className="form-group-label">Mot de passe provisoire</label>
+                                <input name="password" type="password" required className="premium-input" placeholder="••••••••" />
+                            </div>
+                        )}
+
+                        <div className="form-group">
+                            <label className="form-group-label">Rôle / Accès</label>
+                            <select name="role" defaultValue={user?.role || 'client'} className="premium-input">
+                                <option value="client">Client</option>
+                                <option value="admin">Administrateur</option>
+                                <option value="agent">Agent</option>
+                                <option value="technicien">Technicien</option>
+                            </select>
                         </div>
                     </div>
 
-                    <div className="form-group" style={{ marginTop: '15px' }}>
-                        <label>Email</label>
-                        <input name="email" type="email" defaultValue={user?.email} required className="form-control" />
-                    </div>
-
-                    {!isEditing && (
-                        <div className="form-group" style={{ marginTop: '15px' }}>
-                            <label>Mot de passe</label>
-                            <input name="password" type="password" required className="form-control" />
-                        </div>
-                    )}
-
-                    <div className="form-group" style={{ marginTop: '15px' }}>
-                        <label>Rôle</label>
-                        <select name="role" defaultValue={user?.role || 'client'} className="form-control" style={{ width: '100%', padding: '10px', borderRadius: '8px', border: '1px solid #E9EDF7' }}>
-                            <option value="client">Client</option>
-                            <option value="admin">Administrateur</option>
-                            <option value="agent">Agent</option>
-                            <option value="technicien">Technicien</option>
-                        </select>
-                    </div>
-
-                    <div className="form-actions" style={{ marginTop: '25px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                        <button type="button" className="btn btn-secondary" onClick={onCancel}>Annuler</button>
-                        <button type="submit" className="btn btn-primary" style={{ background: '#4318FF', color: 'white', padding: '10px 20px', borderRadius: '10px', fontWeight: '600' }}>
+                    <div className="form-actions mt-4" style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                        <button type="button" className="premium-btn premium-btn-secondary" onClick={onCancel}>Annuler</button>
+                        <button type="submit" className="premium-btn premium-btn-primary">
+                            <i className="fa-solid fa-user-plus"></i>
                             {isEditing ? 'Mettre à jour' : 'Créer l\'utilisateur'}
                         </button>
                     </div>
@@ -1060,35 +1067,45 @@ function AdminDashboardPage() {
         };
 
         return (
-            <div className="admin-form">
+            <div className="premium-form-container animate-fade-in shadow-none p-0 bg-transparent">
                 <form onSubmit={handleSubmit}>
-                    <div className="form-group">
-                        <label>Nom complet</label>
-                        <input name="name" required className="form-control" placeholder="ex: Jean Dupont" />
-                    </div>
-                    <div className="form-row" style={{ display: 'flex', gap: '20px', marginTop: '15px' }}>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label>Téléphone</label>
-                            <input name="phone" required className="form-control" placeholder="+221 ..." />
+                    <div className="form-section">
+                        <div className="form-group mb-4">
+                            <label className="form-group-label">Nom complet du technicien</label>
+                            <input name="name" required className="premium-input" placeholder="ex: Jean Dupont" />
                         </div>
-                        <div className="form-group" style={{ flex: 1 }}>
-                            <label>Email (Optionnel)</label>
-                            <input name="email" type="email" className="form-control" />
+                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '16px' }}>
+                            <div className="form-group">
+                                <label className="form-group-label">Coordonnées (Téléphone)</label>
+                                <input name="phone" required className="premium-input" placeholder="+221 ..." />
+                            </div>
+                            <div className="form-group">
+                                <label className="form-group-label">Email (Optionnel)</label>
+                                <input name="email" type="email" className="premium-input" placeholder="email@exemple.com" />
+                            </div>
                         </div>
                     </div>
-                    <div className="form-group" style={{ marginTop: '15px' }}>
-                        <label>Compétences (séparées par des virgules)</label>
-                        <input
-                            value={skills}
-                            onChange={(e) => setSkills(e.target.value)}
-                            className="form-control"
-                            placeholder="Électricité, Climatisation, Plomberie..."
-                        />
+
+                    <div className="form-section border-0">
+                        <div className="form-group">
+                            <label className="form-group-label">Spécialités / Compétences</label>
+                            <input
+                                value={skills}
+                                onChange={(e) => setSkills(e.target.value)}
+                                className="premium-input"
+                                placeholder="Électricité, Climatisation, Plomberie..."
+                            />
+                            <small className="text-muted mt-2 d-block" style={{ fontSize: '11px', color: '#A3AED0' }}>
+                                Séparez les compétences par des virgules.
+                            </small>
+                        </div>
                     </div>
-                    <div className="form-actions" style={{ marginTop: '25px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
-                        <button type="button" className="btn btn-secondary" onClick={onCancel}>Annuler</button>
-                        <button type="submit" className="btn btn-primary" style={{ background: '#4318FF', color: 'white', padding: '10px 20px', borderRadius: '10px', fontWeight: '600' }}>
-                            Enregistrer
+
+                    <div className="form-actions mt-4" style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                        <button type="button" className="premium-btn premium-btn-secondary" onClick={onCancel}>Annuler</button>
+                        <button type="submit" className="premium-btn premium-btn-primary">
+                            <i className="fa-solid fa-save"></i>
+                            Enregistrer le profil
                         </button>
                     </div>
                 </form>
@@ -1107,46 +1124,38 @@ function AdminDashboardPage() {
                     icon="fa-solid fa-users"
                     label="Active Users"
                     value={dashboardStats?.overview?.totalUsers ?? '-'}
-                    trend="+12%"
-                    trendUp={true}
                     color="primary"
                 />
                 <StatCard
                     icon="fa-solid fa-shopping-cart"
                     label="Commandes"
                     value={dashboardStats?.overview?.totalOrders ?? '-'}
-                    trend="+5%"
-                    trendUp={true}
                     color="info" // Blue
                 />
                 <StatCard
                     icon="fa-solid fa-euro-sign"
                     label="Revenus du mois"
                     value={dashboardStats?.overview?.monthRevenue ? `${dashboardStats.overview.monthRevenue.toLocaleString()} €` : '0 €'}
-                    trend="+8%"
-                    trendUp={true}
                     color="success" // Green
                 />
                 <StatCard
                     icon="fa-solid fa-tools"
                     label="Maintenance"
                     value={dashboardStats?.overview?.activeMaintenance ?? '-'}
-                    trend="-2"
-                    trendUp={false}
                     color="warning" // Yellow
                 />
             </div>
 
-            {/* 2. Main Content Grid - Split 2/3 and 1/3 */}
-            <div className="dashboard-sections-grid" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '20px', marginTop: '30px' }}>
+            {/* 2. Main Content Grid - Full Width */}
+            <div className="dashboard-sections-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px', marginTop: '30px' }}>
 
-                {/* Left Column: Tables/Lists */}
+                {/* Main Column: Tables/Lists */}
                 <div className="dashboard-main-column" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
 
                     {/* Urgencies / Recent Orders Table */}
                     <div className="dashboard-section card">
                         <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-                            <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#2B3674' }}>Urgences</h2>
+                            <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#2B3674' }}>Activités Récentes</h2>
                             <button className="btn-icon"><i className="fa-solid fa-ellipsis-h"></i></button>
                         </div>
 
@@ -1171,48 +1180,6 @@ function AdminDashboardPage() {
                         </div>
                     </div>
 
-                    {/* Recent Activity Table */}
-                    <div className="dashboard-section card">
-                        <div className="section-header" style={{ marginBottom: '20px' }}>
-                            <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#2B3674' }}>Dernières Activités</h2>
-                        </div>
-                        <div className="activity-list">
-                            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <thead>
-                                    <tr style={{ color: '#A3AED0', fontSize: '12px', textAlign: 'left' }}>
-                                        <th style={{ paddingBottom: '10px' }}>Description</th>
-                                        <th style={{ paddingBottom: '10px' }}>Statut</th>
-                                        <th style={{ paddingBottom: '10px' }}>Date</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {activityLogs.slice(0, 3).map(log => (
-                                        <tr key={log.id} style={{ borderBottom: '1px solid #f0f0f0' }}>
-                                            <td style={{ padding: '15px 0', fontWeight: '600', color: '#2B3674' }}>{log.action}</td>
-                                            <td style={{ padding: '15px 0' }}><Badge text="Complet" variant="success" /></td>
-                                            <td style={{ padding: '15px 0', color: '#A3AED0' }}>{new Date(log.createdAt).toLocaleDateString()}</td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Right Column: Charts */}
-                <div className="dashboard-side-column">
-                    <div className="dashboard-section card" style={{ height: '100%' }}>
-                        <div className="section-header" style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between' }}>
-                            <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#2B3674' }}>Statistiques Globales</h2>
-                            <button className="btn-icon"><i className="fa-solid fa-chart-bar"></i></button>
-                        </div>
-                        <div className="chart-container" style={{ height: '200px', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', padding: '0 10px' }}>
-                            {/* CSS Bar Chart */}
-                            {[40, 70, 50, 80, 60, 90, 45].map((h, i) => (
-                                <div key={i} style={{ width: '12%', height: `${h}%`, background: '#4318FF', borderRadius: '5px' }}></div>
-                            ))}
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -1295,13 +1262,6 @@ function AdminDashboardPage() {
                     </div>
 
                     <div className="module-toolbar" style={{ marginBottom: '20px', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-                        <div style={{ flex: 1 }}>
-                            <SearchBar
-                                value={userFilter.search}
-                                onChange={(value) => setUserFilter({ ...userFilter, search: value })}
-                                placeholder="Rechercher par nom, email..."
-                            />
-                        </div>
 
                         <div className="toolbar-filters" style={{ display: 'flex', gap: '15px' }}>
                             <FilterDropdown
@@ -1433,13 +1393,6 @@ function AdminDashboardPage() {
                     {quoteTab === 'devis' ? (
                         <>
                             <div className="module-toolbar" style={{ marginBottom: '20px', display: 'flex', gap: '20px' }}>
-                                <div style={{ flex: 1 }}>
-                                    <SearchBar
-                                        value={quoteFilter.search}
-                                        onChange={(value) => setQuoteFilter({ ...quoteFilter, search: value })}
-                                        placeholder="Rechercher par numéro..."
-                                    />
-                                </div>
                                 <FilterDropdown
                                     label="Statut"
                                     options={[
@@ -1554,13 +1507,6 @@ function AdminDashboardPage() {
         return (
             <>
                 <div className="module-toolbar" style={{ marginBottom: '20px', display: 'flex', gap: '20px' }}>
-                    <div style={{ flex: 1 }}>
-                        <SearchBar
-                            value={orderFilter.search}
-                            onChange={(value) => setOrderFilter({ ...orderFilter, search: value })}
-                            placeholder="Rechercher par numéro..."
-                        />
-                    </div>
 
                     <FilterDropdown
                         label="Statut"
@@ -1673,13 +1619,6 @@ function AdminDashboardPage() {
                     </div>
 
                     <div className="module-toolbar" style={{ marginBottom: '20px', display: 'flex', gap: '20px' }}>
-                        <div style={{ flex: 1 }}>
-                            <SearchBar
-                                value={invoiceFilter.search}
-                                onChange={(value) => setInvoiceFilter({ ...invoiceFilter, search: value })}
-                                placeholder="Rechercher une facture..."
-                            />
-                        </div>
 
                         <FilterDropdown
                             label="Statut"
@@ -1732,13 +1671,6 @@ function AdminDashboardPage() {
                     </div>
 
                     <div className="module-toolbar" style={{ marginBottom: '20px', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
-                        <div style={{ flex: 1 }}>
-                            <SearchBar
-                                value={auditFilter.search}
-                                onChange={(value) => setAuditFilter({ ...auditFilter, search: value })}
-                                placeholder="Rechercher par description, utilisateur..."
-                            />
-                        </div>
 
                         <div className="toolbar-filters" style={{ display: 'flex', gap: '15px' }}>
                             <FilterDropdown
@@ -1903,13 +1835,6 @@ function AdminDashboardPage() {
                     </div>
 
                     <div className="module-toolbar" style={{ marginBottom: '20px', display: 'flex', gap: '20px' }}>
-                        <div style={{ flex: 1 }}>
-                            <SearchBar
-                                value={orderFilter.search}
-                                onChange={(value) => setOrderFilter({ ...orderFilter, search: value })}
-                                placeholder="Rechercher par numéro..."
-                            />
-                        </div>
 
                         <FilterDropdown
                             label="Statut"
@@ -2010,13 +1935,6 @@ function AdminDashboardPage() {
                     </div>
 
                     <div className="module-toolbar" style={{ marginBottom: '20px', display: 'flex', gap: '20px' }}>
-                        <div style={{ flex: 1 }}>
-                            <SearchBar
-                                value={productFilter.search}
-                                onChange={(value) => setProductFilter({ ...productFilter, search: value })}
-                                placeholder="Rechercher par nom, SKU..."
-                            />
-                        </div>
 
                         <FilterDropdown
                             label="Type"
@@ -2384,10 +2302,6 @@ function AdminDashboardPage() {
                     </div>
 
                     <div className="header-right">
-                        <div className="search-bar">
-                            <i className="fa-solid fa-search"></i>
-                            <input type="text" placeholder="Rechercher..." />
-                        </div>
 
                         <button className="notification-btn">
                             <i className="far fa-bell"></i>
