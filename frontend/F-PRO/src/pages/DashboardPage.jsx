@@ -270,7 +270,7 @@ function DashboardPage() {
         return {
             id: order.id,
             type: 'Commande',
-            ref: order.order_number,
+            ref: order.order_number || `CMD-${order.id.substring(0, 8).toUpperCase()}`,
             status: statusText,
             statusClass: statusValue,
             date: new Date(rawDate).toLocaleDateString('fr-FR'),
@@ -327,6 +327,7 @@ function DashboardPage() {
                         return {
                             id: item.id || index,
                             type: typeLabel,
+                            rawType: item.type,
                             number: item.number ? `#${item.number}` : '',
                             status: statusLabel,
                             statusColor: statusColor,
@@ -446,6 +447,15 @@ function DashboardPage() {
                     const allItems = [...fetchedOrders, ...fetchedMaintenance, ...fetchedRentals].sort((a, b) => b.sortDate - a.sortDate);
                     setOrders(allItems);
 
+                    // Auto-select an item if navigating from Recent Activities
+                    const pendingId = sessionStorage.getItem('pendingSuiviId');
+                    if (pendingId) {
+                        sessionStorage.removeItem('pendingSuiviId');
+                        const matchingItem = allItems.find(item => item.id === pendingId);
+                        if (matchingItem) {
+                            setSelectedOrder(matchingItem);
+                        }
+                    }
                 } catch (err) {
                     console.error("Global error in Suivi fetch:", err)
                 } finally {
@@ -471,7 +481,9 @@ function DashboardPage() {
                 setLoading(true)
                 try {
                     const response = await api.get('/products')
-                    setProducts(response.data.data)
+                    // Exclude service/rental products - they belong in Locations only
+                    const catalogueProducts = (response.data.data || []).filter(p => p.type !== 'service')
+                    setProducts(catalogueProducts)
                 } catch (err) {
                     console.error("Error fetching products:", err)
                 } finally {
@@ -751,11 +763,6 @@ function DashboardPage() {
 
                     <div className="header-actions">
 
-                        <button className="notification-btn">
-                            <span className="bell-icon">🔔</span>
-                            <span className="notification-badge"></span>
-                        </button>
-
                         <div
                             className="user-avatar"
                             onClick={() => {
@@ -809,7 +816,11 @@ function DashboardPage() {
                                             )}
                                             {activity.dateDisplay && <span style={{ fontSize: '0.8em', color: '#666', marginLeft: '10px' }}>{activity.dateDisplay}</span>}
                                         </div>
-                                        <button className="details-btn">
+                                        <button className="details-btn" onClick={() => {
+                                            setActiveMenu('suivi')
+                                            // Store the activity ID to auto-select it in suivi after data loads
+                                            sessionStorage.setItem('pendingSuiviId', activity.id)
+                                        }}>
                                             Details <span className="arrow">›</span>
                                         </button>
                                     </div>
@@ -829,11 +840,7 @@ function DashboardPage() {
                                             <div className="product-info">
                                                 <h3 className="product-name">{product.name}</h3>
                                                 <p className="product-desc">{product.description}</p>
-                                                <div className="product-rating">
-                                                    {[...Array(5)].map((_, i) => (
-                                                        <span key={i} className={`star ${i < (product.rating || 0) ? 'filled' : ''}`}>⭐</span>
-                                                    ))}
-                                                </div>
+
                                                 <div className="product-price-container">
                                                     <span className="product-price">{product.base_price ? `${Number(product.base_price).toLocaleString('fr-FR')} FCFA` : product.price}</span>
                                                 </div>

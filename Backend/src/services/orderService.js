@@ -3,7 +3,8 @@ const quoteRepository = require('../repositories/quoteRepository');
 const productRepository = require('../repositories/productRepository');
 const cartService = require('./cartService');
 const quoteService = require('./quoteService');
-const { sequelize } = require('../models');
+const { sequelize, Invoice } = require('../models');
+const invoiceController = require('../controllers/invoiceController');
 const logger = require('../utils/logger');
 
 class OrderService {
@@ -40,6 +41,9 @@ class OrderService {
 
             // 2. Generate Quote automatically from the created order
             await quoteService.createFromOrder(order.id, transaction);
+
+            // 2b. Generate Invoice automatically
+            await invoiceController.internalCreateInvoice(order.id, userId, transaction);
 
             // 3. Clear cart
             await cartService.clearCart(userId);
@@ -92,6 +96,9 @@ class OrderService {
             logger.info(`[DEBUG] createFromQuote: Creating order with ${orderItems.length} items...`);
             const order = await orderRepository.createWithItems(orderData, orderItems, transaction);
 
+            // 3. Generate Invoice automatically
+            await invoiceController.internalCreateInvoice(order.id, quote.user_id, transaction);
+
             await transaction.commit();
             logger.info(`[DEBUG] createFromQuote: Transaction committed. orderId=${order.id}`);
 
@@ -143,6 +150,20 @@ class OrderService {
         if (status === 'in_progress') finalStatus = 'processing';
 
         await order.update({ status: finalStatus });
+
+        // If delivered, mark associated invoice as paid
+        if (finalStatus === 'delivered') {
+            const invoice = await Invoice.findOne({ where: { order_id: orderId } });
+            if (invoice && invoice.status !== 'paid') {
+                await invoice.update({
+                    status: 'paid',
+                    paid_at: new Date(),
+                    payment_method: 'Auto-confirmed on delivery'
+                });
+                logger.info(`[INFO] Invoice ${invoice.invoice_number} marked as paid due to delivery confirmation.`);
+            }
+        }
+
         return await orderRepository.findWithDetails(orderId);
     }
 

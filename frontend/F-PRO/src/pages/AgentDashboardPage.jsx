@@ -11,6 +11,23 @@ function AgentDashboardPage() {
     const socket = useSocket() // Access socket
     const [activeMenu, setActiveMenu] = useState('dashboard')
     const [loading, setLoading] = useState(true)
+    const [user, setUser] = useState(null)
+    const [previousMenu, setPreviousMenu] = useState('dashboard')
+
+    // Profile State
+    const [editProfileMode, setEditProfileMode] = useState(false)
+    const [showPasswordModal, setShowPasswordModal] = useState(false)
+    const [profileFormData, setProfileFormData] = useState({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: ''
+    })
+    const [passwordFormData, setPasswordFormData] = useState({
+        current_password: '',
+        new_password: '',
+        confirm_password: ''
+    })
 
     const [products, setProducts] = useState([])
     const [orders, setOrders] = useState([])
@@ -42,8 +59,24 @@ function AgentDashboardPage() {
     const [rentals, setRentals] = useState([])
 
     useEffect(() => {
+        const userData = JSON.parse(localStorage.getItem('user'))
+        setUser(userData)
         fetchAgentData()
     }, [])
+
+    useEffect(() => {
+        if (activeMenu !== 'profile') {
+            setPreviousMenu(activeMenu)
+        }
+        if (activeMenu === 'profile' && user) {
+            setProfileFormData({
+                first_name: user.first_name || '',
+                last_name: user.last_name || '',
+                email: user.email || '',
+                phone: user.phone || ''
+            })
+        }
+    }, [activeMenu, user])
 
     // Real-time Notifications Listener
     useEffect(() => {
@@ -204,7 +237,52 @@ function AgentDashboardPage() {
             fetchAgentData()
             alert('Location confirmée.')
         } catch (error) {
-            alert('Erreur lors de la confirmation')
+            alert('Erreur lors de la validation')
+        }
+    }
+
+    const handleUpdateProfile = async (e) => {
+        e.preventDefault()
+        try {
+            const response = await api.put('/auth/profile', profileFormData)
+            const updatedUser = response.data.data
+
+            const userName = updatedUser.name ||
+                (updatedUser.first_name && updatedUser.last_name ? `${updatedUser.first_name} ${updatedUser.last_name}` :
+                    updatedUser.first_name || updatedUser.last_name || 'Agent');
+
+            const fullUser = {
+                ...updatedUser,
+                name: userName
+            }
+
+            setUser(fullUser)
+            localStorage.setItem('user', JSON.stringify(fullUser))
+            setEditProfileMode(false)
+            alert('Profil mis à jour avec succès !')
+        } catch (error) {
+            console.error('Update profile error:', error)
+            alert(error.response?.data?.message || 'Erreur lors de la mise à jour du profil')
+        }
+    }
+
+    const handleChangePassword = async (e) => {
+        e.preventDefault()
+        if (passwordFormData.new_password !== passwordFormData.confirm_password) {
+            alert('Les nouveaux mots de passe ne correspondent pas')
+            return
+        }
+        try {
+            await api.post('/auth/change-password', {
+                current_password: passwordFormData.current_password,
+                new_password: passwordFormData.new_password
+            })
+            setShowPasswordModal(false)
+            setPasswordFormData({ current_password: '', new_password: '', confirm_password: '' })
+            alert('Mot de passe modifié avec succès !')
+        } catch (error) {
+            console.error('Change password error:', error)
+            alert(error.response?.data?.message || 'Erreur lors du changement de mot de passe')
         }
     }
 
@@ -351,6 +429,200 @@ function AgentDashboardPage() {
         }
     };
 
+    const renderProfile = () => {
+        if (!user) return null;
+
+        const sidebarStats = [
+            { label: 'Devis Acceptés', count: stats.acceptedQuotes, icon: 'fa-file-invoice' },
+            { label: 'Commandes', count: stats.ordersInProgress, icon: 'fa-shopping-basket' }
+        ];
+
+        return (
+            <div className="profile-section-agent fade-in" style={{ padding: '0 5px' }}>
+                <button
+                    className="btn-operational btn-secondary-op mb-4"
+                    onClick={() => setActiveMenu(previousMenu)}
+                    style={{ borderRadius: '12px', padding: '10px 20px', display: 'flex', alignItems: 'center', gap: '8px' }}
+                >
+                    <i className="fa-solid fa-arrow-left"></i> Retour
+                </button>
+
+                <div className="profile-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 2fr', gap: '30px' }}>
+                    {/* Sidebar */}
+                    <div className="profile-card" style={{ background: 'white', padding: '40px 30px', borderRadius: '24px', textAlign: 'center', boxShadow: 'var(--agent-shadow)' }}>
+                        <div className="avatar-large-wrapper" style={{ position: 'relative', width: '130px', height: '130px', margin: '0 auto 24px' }}>
+                            <img
+                                src={`https://ui-avatars.com/api/?name=${user.first_name || 'Agent'}+${user.last_name || 'User'}&background=4318FF&color=fff&size=256`}
+                                alt="Agent"
+                                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: '4px solid #F4F7FE' }}
+                            />
+                            <div style={{ position: 'absolute', bottom: '5px', right: '5px', width: '20px', height: '20px', background: '#05CD99', borderRadius: '50%', border: '3px solid white' }}></div>
+                        </div>
+                        <h2 style={{ fontSize: '24px', color: '#2B3674', fontWeight: '800', marginBottom: '8px' }}>
+                            {user.first_name} {user.last_name}
+                        </h2>
+                        <div style={{ color: '#4318FF', fontWeight: '700', fontSize: '14px', marginBottom: '24px', background: '#F4F7FE', display: 'inline-block', padding: '6px 16px', borderRadius: '20px' }}>
+                            Agent Commercial
+                        </div>
+
+                        <div style={{ display: 'flex', justifyContent: 'space-around', paddingTop: '24px', borderTop: '1px solid #F4F7FE' }}>
+                            {sidebarStats.map((stat, i) => (
+                                <div key={i}>
+                                    <div style={{ fontSize: '20px', fontWeight: '800', color: '#2B3674' }}>{stat.count}</div>
+                                    <div style={{ fontSize: '12px', color: '#A3AED0', fontWeight: '500' }}>{stat.label}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Content */}
+                    <div className="profile-details-column">
+                        <div className="profile-card" style={{ background: 'white', padding: '32px', borderRadius: '24px', boxShadow: 'var(--agent-shadow)', marginBottom: '30px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
+                                <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#2B3674', margin: 0 }}>Détails du compte</h3>
+                                {!editProfileMode && (
+                                    <button className="btn-operational btn-primary-op" onClick={() => setEditProfileMode(true)}>
+                                        <i className="fa-solid fa-pen-to-square"></i> Modifier
+                                    </button>
+                                )}
+                            </div>
+
+                            {editProfileMode ? (
+                                <form onSubmit={handleUpdateProfile}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+                                        <div className="form-group-op">
+                                            <label style={{ display: 'block', marginBottom: '8px', color: '#2B3674', fontWeight: '700', fontSize: '14px' }}>Prénom</label>
+                                            <input
+                                                type="text"
+                                                className="form-input-op"
+                                                value={profileFormData.first_name}
+                                                onChange={(e) => setProfileFormData({ ...profileFormData, first_name: e.target.value })}
+                                                style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: '#F4F7FE' }}
+                                            />
+                                        </div>
+                                        <div className="form-group-op">
+                                            <label style={{ display: 'block', marginBottom: '8px', color: '#2B3674', fontWeight: '700', fontSize: '14px' }}>Nom</label>
+                                            <input
+                                                type="text"
+                                                className="form-input-op"
+                                                value={profileFormData.last_name}
+                                                onChange={(e) => setProfileFormData({ ...profileFormData, last_name: e.target.value })}
+                                                style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: '#F4F7FE' }}
+                                            />
+                                        </div>
+                                        <div className="form-group-op">
+                                            <label style={{ display: 'block', marginBottom: '8px', color: '#2B3674', fontWeight: '700', fontSize: '14px' }}>Email</label>
+                                            <input
+                                                type="email"
+                                                className="form-input-op"
+                                                value={profileFormData.email}
+                                                onChange={(e) => setProfileFormData({ ...profileFormData, email: e.target.value })}
+                                                style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: '#F4F7FE' }}
+                                            />
+                                        </div>
+                                        <div className="form-group-op">
+                                            <label style={{ display: 'block', marginBottom: '8px', color: '#2B3674', fontWeight: '700', fontSize: '14px' }}>Téléphone</label>
+                                            <input
+                                                type="text"
+                                                className="form-input-op"
+                                                value={profileFormData.phone}
+                                                onChange={(e) => setProfileFormData({ ...profileFormData, phone: e.target.value })}
+                                                style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: '#F4F7FE' }}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                        <button type="submit" className="btn-operational btn-primary-op" style={{ background: '#05CD99' }}>Enregistrer</button>
+                                        <button type="button" className="btn-operational btn-secondary-op" onClick={() => setEditProfileMode(false)}>Annuler</button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '40px' }}>
+                                    <div>
+                                        <label style={{ fontSize: '12px', color: '#A3AED0', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Nom complet</label>
+                                        <div style={{ color: '#2B3674', fontWeight: '700' }}>{user.first_name} {user.last_name}</div>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '12px', color: '#A3AED0', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Email professionnel</label>
+                                        <div style={{ color: '#2B3674', fontWeight: '700' }}>{user.email}</div>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '12px', color: '#A3AED0', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Téléphone</label>
+                                        <div style={{ color: '#2B3674', fontWeight: '700' }}>{user.phone || 'Non renseigné'}</div>
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '12px', color: '#A3AED0', fontWeight: '500', display: 'block', marginBottom: '4px' }}>Inscrit le</label>
+                                        <div style={{ color: '#2B3674', fontWeight: '700' }}>{new Date(user.createdAt || user.created_at).toLocaleDateString()}</div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="profile-card" style={{ background: 'white', padding: '32px', borderRadius: '24px', boxShadow: 'var(--agent-shadow)' }}>
+                            <h3 style={{ fontSize: '20px', fontWeight: '800', color: '#2B3674', marginBottom: '24px' }}>Sécurité du compte</h3>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F4F7FE', padding: '24px', borderRadius: '16px' }}>
+                                <div>
+                                    <div style={{ fontWeight: '700', color: '#2B3674', marginBottom: '4px' }}>Modification du mot de passe</div>
+                                    <p style={{ margin: 0, fontSize: '13px', color: '#A3AED0' }}>Mettez à jour régulièrement votre mot de passe pour plus de sécurité.</p>
+                                </div>
+                                <button className="btn-operational btn-primary-op" onClick={() => setShowPasswordModal(true)}>
+                                    Changer
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {showPasswordModal && (
+                    <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1200 }}>
+                        <div className="modal-content" style={{ background: 'white', padding: '32px', borderRadius: '24px', width: '400px', maxWidth: '90%' }}>
+                            <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '24px', color: '#2B3674' }}>Changer le mot de passe</h2>
+                            <form onSubmit={handleChangePassword}>
+                                <div style={{ marginBottom: '16px' }}>
+                                    <label style={{ display: 'block', marginBottom: '8px', color: '#2B3674', fontWeight: '700', fontSize: '14px' }}>Mot de passe actuel</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        className="form-input-op"
+                                        value={passwordFormData.current_password}
+                                        onChange={(e) => setPasswordFormData({ ...passwordFormData, current_password: e.target.value })}
+                                        style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: '#F4F7FE' }}
+                                    />
+                                </div>
+                                <div style={{ marginBottom: '16px' }}>
+                                    <label style={{ display: 'block', marginBottom: '8px', color: '#2B3674', fontWeight: '700', fontSize: '14px' }}>Nouveau mot de passe</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        className="form-input-op"
+                                        value={passwordFormData.new_password}
+                                        onChange={(e) => setPasswordFormData({ ...passwordFormData, new_password: e.target.value })}
+                                        style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: '#F4F7FE' }}
+                                    />
+                                </div>
+                                <div style={{ marginBottom: '24px' }}>
+                                    <label style={{ display: 'block', marginBottom: '8px', color: '#2B3674', fontWeight: '700', fontSize: '14px' }}>Confirmer le nouveau mot de passe</label>
+                                    <input
+                                        type="password"
+                                        required
+                                        className="form-input-op"
+                                        value={passwordFormData.confirm_password}
+                                        onChange={(e) => setPasswordFormData({ ...passwordFormData, confirm_password: e.target.value })}
+                                        style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: '#F4F7FE' }}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                                    <button type="button" className="btn-operational btn-secondary-op" onClick={() => setShowPasswordModal(false)}>Annuler</button>
+                                    <button type="submit" className="btn-operational btn-primary-op" style={{ background: '#4318FF', color: 'white' }}>Mettre à jour</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
     const handleLogout = () => {
         localStorage.clear()
         navigate('/login')
@@ -364,6 +636,7 @@ function AgentDashboardPage() {
         { id: 'reports', label: 'Rapports', icon: <i className="fa-solid fa-file-export"></i> },
         { id: 'maintenance', label: 'Interventions', icon: <i className="fa-solid fa-screwdriver-wrench"></i> },
         { id: 'rentals', label: 'Locations', icon: <i className="fa-solid fa-key"></i> },
+        { id: 'profile', label: 'Mon Profil', icon: <i className="fa-solid fa-user-gear"></i> },
         { id: 'param', label: 'Paramètres', icon: <i className="fa-solid fa-gears"></i> },
     ]
 
@@ -430,9 +703,15 @@ function AgentDashboardPage() {
                         <h1 className="agent-page-title">{menuItems.find(m => m.id === activeMenu)?.label}</h1>
                     </div>
                     <div className="agent-header-actions">
-                        <div className="user-profile-header" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80" alt="Avatar" style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #F4F7FE' }} />
-                            <span className="agent-username" style={{ color: '#2B3674', fontWeight: '700' }}>Sébastien Lemaire</span>
+                        <div className="user-profile-header" style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => setActiveMenu('profile')}>
+                            <img
+                                src={`https://ui-avatars.com/api/?name=${user?.first_name || 'Agent'}+${user?.last_name || 'User'}&background=4318FF&color=fff&size=128`}
+                                alt="Avatar"
+                                style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', border: '2px solid #F4F7FE' }}
+                            />
+                            <span className="agent-username" style={{ color: '#2B3674', fontWeight: '700' }}>
+                                {user?.first_name || 'Agent'} {user?.last_name || ''}
+                            </span>
                         </div>
                     </div>
                 </header>
@@ -497,10 +776,6 @@ function AgentDashboardPage() {
                                         <div className="activity-card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                                             <div style={{ display: 'flex', gap: '20px' }}>
                                                 <h2 style={{ fontSize: '18px', fontWeight: '700', color: '#2B3674' }}>Activité Récente</h2>
-                                                <div className="activity-tabs" style={{ display: 'flex', gap: '16px', fontSize: '12px', fontWeight: '700', color: '#A3AED0' }}>
-                                                    <span style={{ color: '#4318FF', borderBottom: '2px solid #4318FF', paddingBottom: '4px', cursor: 'pointer' }}>Interventions</span>
-                                                    <span style={{ cursor: 'pointer' }}>Situation...</span>
-                                                </div>
                                             </div>
                                             <span style={{ fontSize: '13px', color: '#4318FF', cursor: 'pointer', fontWeight: '700' }}>Voir tout</span>
                                         </div>
@@ -520,7 +795,7 @@ function AgentDashboardPage() {
                                                         .slice(0, 8)
                                                         .map((item, idx) => (
                                                             <tr key={idx}>
-                                                                <td><code>{item.order_number}</code></td>
+                                                                <td><code>{item.type === 'Commande' ? item.order_number : `MNT-${item.order_number}`}</code></td>
                                                                 <td>{item.user?.first_name} {item.user?.last_name}</td>
                                                                 <td style={{ color: '#A3AED0', fontWeight: '500' }}>{item.type}</td>
                                                                 <td>
@@ -679,7 +954,7 @@ function AgentDashboardPage() {
                                 <tbody>
                                     {rentals.map(rental => (
                                         <tr key={rental.id}>
-                                            <td><code>{rental.id.substring(0, 8).toUpperCase()}</code></td>
+                                            <td><code>LOC-{rental.id.substring(0, 8).toUpperCase()}</code></td>
                                             <td>{rental.user?.first_name} {rental.user?.last_name}</td>
                                             <td><span className={`status-badge status-${rental.status === 'active' || rental.status === 'confirmed' ? 'termine' : rental.status === 'returned' ? 'en-attente' : 'critique'}`}>{rental.status}</span></td>
                                             <td style={{ fontWeight: 'bold' }}>{rental.total_price} €</td>
@@ -835,6 +1110,8 @@ function AgentDashboardPage() {
                             </div>
                         </div>
                     )}
+
+                    {activeMenu === 'profile' && renderProfile()}
                 </div>
             </main >
 

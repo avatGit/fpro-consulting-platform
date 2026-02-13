@@ -91,6 +91,23 @@ function AdminDashboardPage() {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [selectedMaintenance, setSelectedMaintenance] = useState(null);
 
+    // Profile State
+    const [editProfileMode, setEditProfileMode] = useState(false);
+    const [showPasswordModal, setShowPasswordModal] = useState(false);
+    const [profileFormData, setProfileFormData] = useState({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: ''
+    });
+    const [passwordFormData, setPasswordFormData] = useState({
+        current_password: '',
+        new_password: '',
+        confirm_password: ''
+    });
+
+    const [previousModule, setPreviousModule] = useState('dashboard');
+
     // Notifications & Confirmations
     const [toasts, setToasts] = useState([]);
     const [confirmModal, setConfirmModal] = useState({
@@ -131,6 +148,9 @@ function AdminDashboardPage() {
     useEffect(() => {
         const userData = JSON.parse(localStorage.getItem('user'));
         setUser(userData);
+        if (activeModule !== 'profile') {
+            setPreviousModule(activeModule);
+        }
         loadModuleData(activeModule);
     }, [activeModule]);
 
@@ -168,6 +188,16 @@ function AdminDashboardPage() {
                 case 'maintenance':
                     await Promise.all([loadMaintenance(), loadUsers(), loadTechnicians()]);
                     break;
+                case 'profile':
+                    if (user) {
+                        setProfileFormData({
+                            first_name: user.first_name || '',
+                            last_name: user.last_name || '',
+                            email: user.email || '',
+                            phone: user.phone || ''
+                        });
+                    }
+                    break;
                 default:
                     break;
             }
@@ -175,6 +205,52 @@ function AdminDashboardPage() {
             console.error(`Error loading ${module}:`, error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleUpdateProfile = async (e) => {
+        e.preventDefault();
+        try {
+            const response = await api.put('/auth/profile', profileFormData);
+            const updatedUser = response.data.data;
+
+            // Reconstruct the name for UI consistency if needed
+            const userName = updatedUser.name ||
+                (updatedUser.first_name && updatedUser.last_name ? `${updatedUser.first_name} ${updatedUser.last_name}` :
+                    updatedUser.first_name || updatedUser.last_name || 'Admin');
+
+            const fullUser = {
+                ...updatedUser,
+                name: userName
+            };
+
+            setUser(fullUser);
+            localStorage.setItem('user', JSON.stringify(fullUser));
+            setEditProfileMode(false);
+            addToast('Profil mis à jour avec succès', 'success');
+        } catch (error) {
+            console.error('Update profile error:', error);
+            addToast(error.response?.data?.message || 'Erreur lors de la mise à jour du profil', 'error');
+        }
+    };
+
+    const handleChangePassword = async (e) => {
+        e.preventDefault();
+        if (passwordFormData.new_password !== passwordFormData.confirm_password) {
+            addToast('Les nouveaux mots de passe ne correspondent pas', 'error');
+            return;
+        }
+        try {
+            await api.post('/auth/change-password', {
+                current_password: passwordFormData.current_password,
+                new_password: passwordFormData.new_password
+            });
+            setShowPasswordModal(false);
+            setPasswordFormData({ current_password: '', new_password: '', confirm_password: '' });
+            addToast('Mot de passe modifié avec succès', 'success');
+        } catch (error) {
+            console.error('Change password error:', error);
+            addToast(error.response?.data?.message || 'Erreur lors du changement de mot de passe', 'error');
         }
     };
 
@@ -1109,6 +1185,204 @@ function AdminDashboardPage() {
                         </button>
                     </div>
                 </form>
+            </div>
+        );
+    };
+
+    const renderProfile = () => {
+        if (!user) return null;
+
+        const sidebarStats = [
+            { label: 'Utilisateurs', count: dashboardStats?.overview?.totalUsers || 0, icon: 'fa-users' },
+            { label: 'Commandes', count: dashboardStats?.overview?.totalOrders || 0, icon: 'fa-shopping-cart' }
+        ];
+
+        return (
+            <div className="profile-section fade-in" style={{ padding: '0 20px' }}>
+                <button
+                    className="btn btn-secondary mb-4"
+                    onClick={() => setActiveModule(previousModule)}
+                    style={{ borderRadius: '10px' }}
+                >
+                    <i className="fa-solid fa-arrow-left"></i> Retour
+                </button>
+
+                <div className="profile-container" style={{ display: 'grid', gridTemplateColumns: 'minmax(300px, 1fr) 2fr', gap: '30px' }}>
+                    {/* Profile Summary Card */}
+                    <div className="profile-sidebar-card card" style={{ padding: '30px', textAlign: 'center' }}>
+                        <div className="profile-main-info">
+                            <div className="large-avatar" style={{ width: '120px', height: '120px', borderRadius: '50%', margin: '0 auto 20px', border: '4px solid #F4F7FE', overflow: 'hidden' }}>
+                                <img
+                                    src={`https://ui-avatars.com/api/?name=${user.first_name || 'Admin'}+${user.last_name || 'User'}&background=11047A&color=fff&size=200`}
+                                    alt="Admin"
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                                />
+                            </div>
+                            <h2 style={{ fontSize: '24px', color: '#2B3674', fontWeight: '800' }}>
+                                {user.first_name} {user.last_name}
+                            </h2>
+                            <p style={{ color: '#A3AED0', fontWeight: '500', textTransform: 'capitalize' }}>{user.role}</p>
+                            <div className="badge-premium" style={{ background: '#E9EDF7', color: '#4318FF', padding: '6px 16px', borderRadius: '20px', display: 'inline-block', marginTop: '10px', fontWeight: '700', fontSize: '13px' }}>
+                                Administrateur Système
+                            </div>
+                        </div>
+
+                        <div className="quick-stats-row" style={{ display: 'flex', justifyContent: 'center', gap: '40px', marginTop: '30px', borderTop: '1px solid #F4F7FE', paddingTop: '20px' }}>
+                            {sidebarStats.map((stat, idx) => (
+                                <div key={idx} className="quick-stat">
+                                    <div style={{ fontSize: '20px', fontWeight: '800', color: '#2B3674' }}>{stat.count}</div>
+                                    <div style={{ fontSize: '12px', color: '#A3AED0', fontWeight: '500' }}>{stat.label}</div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Profile Details Card */}
+                    <div className="profile-details-column">
+                        <div className="card" style={{ padding: '30px', marginBottom: '30px' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                                <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#2B3674', margin: 0 }}>Informations Personnelles</h3>
+                                {!editProfileMode && (
+                                    <button className="btn btn-primary btn-sm" onClick={() => setEditProfileMode(true)}>
+                                        <i className="fa-solid fa-edit"></i> Modifier
+                                    </button>
+                                )}
+                            </div>
+
+                            {editProfileMode ? (
+                                <form onSubmit={handleUpdateProfile}>
+                                    <div className="details-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+                                        <div className="form-group">
+                                            <label className="form-group-label">Prénom</label>
+                                            <input
+                                                type="text"
+                                                className="premium-input"
+                                                value={profileFormData.first_name}
+                                                onChange={(e) => setProfileFormData({ ...profileFormData, first_name: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-group-label">Nom</label>
+                                            <input
+                                                type="text"
+                                                className="premium-input"
+                                                value={profileFormData.last_name}
+                                                onChange={(e) => setProfileFormData({ ...profileFormData, last_name: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-group-label">Email</label>
+                                            <input
+                                                type="email"
+                                                className="premium-input"
+                                                value={profileFormData.email}
+                                                onChange={(e) => setProfileFormData({ ...profileFormData, email: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="form-group-label">Téléphone</label>
+                                            <input
+                                                type="text"
+                                                className="premium-input"
+                                                value={profileFormData.phone}
+                                                onChange={(e) => setProfileFormData({ ...profileFormData, phone: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div style={{ display: 'flex', gap: '12px' }}>
+                                        <button type="submit" className="btn btn-success">Enregistrer</button>
+                                        <button type="button" className="btn btn-secondary" onClick={() => setEditProfileMode(false)}>Annuler</button>
+                                    </div>
+                                </form>
+                            ) : (
+                                <div className="details-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px' }}>
+                                    <div className="detail-item">
+                                        <label style={{ display: 'block', fontSize: '13px', color: '#A3AED0', marginBottom: '5px' }}>Nom Complet</label>
+                                        <div style={{ fontWeight: '600', color: '#2B3674' }}>{user.first_name} {user.last_name}</div>
+                                    </div>
+                                    <div className="detail-item">
+                                        <label style={{ display: 'block', fontSize: '13px', color: '#A3AED0', marginBottom: '5px' }}>Email</label>
+                                        <div style={{ fontWeight: '600', color: '#2B3674' }}>{user.email}</div>
+                                    </div>
+                                    <div className="detail-item">
+                                        <label style={{ display: 'block', fontSize: '13px', color: '#A3AED0', marginBottom: '5px' }}>Rôle</label>
+                                        <div style={{ fontWeight: '600', color: '#2B3674', textTransform: 'capitalize' }}>{user.role}</div>
+                                    </div>
+                                    <div className="detail-item">
+                                        <label style={{ display: 'block', fontSize: '13px', color: '#A3AED0', marginBottom: '5px' }}>Téléphone</label>
+                                        <div style={{ fontWeight: '600', color: '#2B3674' }}>{user.phone || 'Non renseigné'}</div>
+                                    </div>
+                                    <div className="detail-item">
+                                        <label style={{ display: 'block', fontSize: '13px', color: '#A3AED0', marginBottom: '5px' }}>Membre depuis</label>
+                                        <div style={{ fontWeight: '600', color: '#2B3674' }}>{new Date(user.createdAt || user.created_at).toLocaleDateString()}</div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="card" style={{ padding: '30px' }}>
+                            <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#2B3674', marginBottom: '20px' }}>Sécurité</h3>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#F4F7FE', padding: '20px', borderRadius: '15px' }}>
+                                <div>
+                                    <div style={{ fontWeight: '700', color: '#2B3674' }}>Mot de passe</div>
+                                    <div style={{ fontSize: '13px', color: '#A3AED0' }}>Dernière modification : Il y a un mois</div>
+                                </div>
+                                <button className="btn btn-outline-primary" onClick={() => setShowPasswordModal(true)}>
+                                    Changer le mot de passe
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Password Modal Integration */}
+                {showPasswordModal && (
+                    <div className="modal-backdrop show" style={{ zIndex: 1200 }}></div>
+                ) && (
+                        <Modal
+                            isOpen={true}
+                            title="Changer le mot de passe"
+                            onClose={() => setShowPasswordModal(false)}
+                            size="small"
+                        >
+                            <form onSubmit={handleChangePassword}>
+                                <div className="form-group mb-3">
+                                    <label className="form-group-label">Mot de passe actuel</label>
+                                    <input
+                                        type="password"
+                                        className="premium-input"
+                                        required
+                                        value={passwordFormData.current_password}
+                                        onChange={(e) => setPasswordFormData({ ...passwordFormData, current_password: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group mb-3">
+                                    <label className="form-group-label">Nouveau mot de passe</label>
+                                    <input
+                                        type="password"
+                                        className="premium-input"
+                                        required
+                                        value={passwordFormData.new_password}
+                                        onChange={(e) => setPasswordFormData({ ...passwordFormData, new_password: e.target.value })}
+                                    />
+                                </div>
+                                <div className="form-group mb-4">
+                                    <label className="form-group-label">Confirmer le nouveau mot de passe</label>
+                                    <input
+                                        type="password"
+                                        className="premium-input"
+                                        required
+                                        value={passwordFormData.confirm_password}
+                                        onChange={(e) => setPasswordFormData({ ...passwordFormData, confirm_password: e.target.value })}
+                                    />
+                                </div>
+                                <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
+                                    <button type="button" className="btn btn-secondary" onClick={() => setShowPasswordModal(false)}>Annuler</button>
+                                    <button type="submit" className="btn btn-primary">Mettre à jour</button>
+                                </div>
+                            </form>
+                        </Modal>
+                    )}
             </div>
         );
     };
@@ -2276,6 +2550,17 @@ function AdminDashboardPage() {
                         <span className="nav-arrow">›</span>
                     </button>
 
+                    <button
+                        className={`admin-nav-item ${activeModule === 'profile' ? 'active' : ''}`}
+                        onClick={() => setActiveModule('profile')}
+                    >
+                        <div className="nav-icon-wrapper">
+                            <i className="fa-solid fa-user-gear"></i>
+                        </div>
+                        <span className="nav-label">Mon Profil</span>
+                        <span className="nav-arrow">›</span>
+                    </button>
+
                     <div style={{ marginTop: 'auto', paddingBottom: 'var(--spacing-xl)' }}>
                         <button
                             className="admin-nav-item"
@@ -2302,13 +2587,7 @@ function AdminDashboardPage() {
                     </div>
 
                     <div className="header-right">
-
-                        <button className="notification-btn">
-                            <i className="far fa-bell"></i>
-                            <span className="notification-badge"></span>
-                        </button>
-
-                        <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                        <div className="user-profile" style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }} onClick={() => setActiveModule('profile')}>
                             <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column' }}>
                                 <span style={{ fontSize: '14px', fontWeight: '700', color: '#2B3674', lineHeight: '1.2' }}>
                                     {user?.first_name || 'Admin'} {user?.last_name || 'User'}
@@ -2347,6 +2626,7 @@ function AdminDashboardPage() {
                             {activeModule === 'products' && renderProducts()}
                             {activeModule === 'maintenance' && renderMaintenance()}
                             {activeModule === 'technicians' && renderTechnicians()}
+                            {activeModule === 'profile' && renderProfile()}
                         </>
                     )}
                 </div>

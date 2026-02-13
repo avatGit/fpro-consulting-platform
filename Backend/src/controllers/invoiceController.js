@@ -8,30 +8,52 @@ class InvoiceController {
      * POST /api/admin/invoices
      * Créer une facture à partir d'une commande
      */
+    /**
+     * POST /api/admin/invoices
+     * Créer une facture à partir d'une commande
+     */
     async createInvoice(req, res) {
-        const transaction = await sequelize.transaction();
-
         try {
             const { orderId } = req.body;
+            const invoice = await this.internalCreateInvoice(orderId, req.userId);
+            return ResponseHandler.created(res, invoice, 'Facture créée avec succès');
+        } catch (error) {
+            logger.error('Create invoice error:', error);
+            if (error.message === 'Commande non trouvée') return ResponseHandler.notFound(res, error.message);
+            if (error.message === 'Une facture existe déjà pour cette commande') return ResponseHandler.error(res, error.message, 409);
+            return ResponseHandler.serverError(res, error);
+        }
+    }
 
+    /**
+     * Méthode interne pour créer une facture (réutilisable par d'autres services)
+     */
+    async internalCreateInvoice(orderId, userId, transaction = null) {
+        const localTransaction = !transaction ? await sequelize.transaction() : transaction;
+
+        try {
             // Vérifier que la commande existe
             const order = await Order.findByPk(orderId, {
                 include: [
                     { model: OrderItem, as: 'items', include: [{ model: Product, as: 'product' }] },
                     { model: Company, as: 'company' }
-                ]
+                ],
+                transaction: localTransaction
             });
 
             if (!order) {
-                await transaction.rollback();
-                return ResponseHandler.notFound(res, 'Commande non trouvée');
+                if (!transaction) await localTransaction.rollback();
+                throw new Error('Commande non trouvée');
             }
 
             // Vérifier qu'il n'y a pas déjà une facture
-            const existingInvoice = await Invoice.findOne({ where: { order_id: orderId } });
+            const existingInvoice = await Invoice.findOne({
+                where: { order_id: orderId },
+                transaction: localTransaction
+            });
             if (existingInvoice) {
-                await transaction.rollback();
-                return ResponseHandler.error(res, 'Une facture existe déjà pour cette commande', 409);
+                if (!transaction) await localTransaction.rollback();
+                throw new Error('Une facture existe déjà pour cette commande');
             }
 
             // Générer le numéro de facture
@@ -40,7 +62,8 @@ class InvoiceController {
                 where: {
                     invoice_number: { [Op.like]: `INV-${year}-%` }
                 },
-                order: [['created_at', 'DESC']]
+                order: [['created_at', 'DESC']],
+                transaction: localTransaction
             });
 
             let invoiceNumber;
@@ -69,16 +92,15 @@ class InvoiceController {
                 status: 'sent',
                 issue_date: new Date(),
                 due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
-                created_by: req.userId
-            }, { transaction });
+                created_by: userId
+            }, { transaction: localTransaction });
 
-            await transaction.commit();
+            if (!transaction) await localTransaction.commit();
 
-            return ResponseHandler.created(res, invoice, 'Facture créée avec succès');
+            return invoice;
         } catch (error) {
-            await transaction.rollback();
-            logger.error('Create invoice error:', error);
-            return ResponseHandler.serverError(res, error);
+            if (!transaction) await localTransaction.rollback();
+            throw error;
         }
     }
 

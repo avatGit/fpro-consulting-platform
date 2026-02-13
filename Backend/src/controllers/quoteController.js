@@ -44,17 +44,14 @@ class QuoteController {
 
     async listUserQuotes(req, res) {
         try {
-            // Only return accepted quotes (those that became orders)
             const { Quote } = require('../models');
-            const { Op } = require('sequelize');
             const quotes = await Quote.findAll({
                 where: {
-                    user_id: req.userId,
-                    status: 'accepted'
+                    user_id: req.userId
                 },
                 order: [['created_at', 'DESC']]
             });
-            return ResponseHandler.success(res, quotes, 'Liste des devis acceptés récupérée');
+            return ResponseHandler.success(res, quotes, 'Liste de vos devis récupérée');
         } catch (error) {
             return ResponseHandler.serverError(res, error);
         }
@@ -197,7 +194,7 @@ class QuoteController {
 
             if (quote.status !== 'pending' && quote.status !== 'sent') {
                 logger.warn(`[DEBUG] Invalid status: ${quote.status}`);
-                return ResponseHandler.error(res, 'Ce devis ne peut plus être accepté', 400);
+                return ResponseHandler.error(res, 'Ce devis ne peut plus être accepté ou est déjà converti en commande', 400);
             }
 
             logger.info(`[DEBUG] Updating status to accepted...`);

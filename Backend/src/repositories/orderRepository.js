@@ -21,10 +21,10 @@ class OrderRepository extends BaseRepository {
         const year = new Date().getFullYear();
         const count = await this.model.count({
             where: {
-                order_number: { [Op.like]: `O-${year}-%` }
+                order_number: { [Op.like]: `CMD-${year}-%` }
             }
         });
-        return `O-${year}-${(count + 1).toString().padStart(6, '0')}`;
+        return `CMD-${year}-${(count + 1).toString().padStart(6, '0')}`;
     }
 
     async createWithItems(orderData, items, transaction) {

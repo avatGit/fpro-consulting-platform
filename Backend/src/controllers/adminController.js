@@ -26,11 +26,11 @@ class AdminController {
                 User.count({ where: { is_active: true } }),
                 Order.count(),
                 Order.count({ where: { status: 'pending' } }),
-                Order.sum('total_amount', { where: { status: { [Op.in]: ['delivered'] } } }),
-                Order.sum('total_amount', {
+                Invoice.sum('total_amount', { where: { status: 'paid' } }),
+                Invoice.sum('total_amount', {
                     where: {
-                        status: { [Op.in]: ['delivered'] },
-                        created_at: {
+                        status: 'paid',
+                        paid_at: {
                             [Op.gte]: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
                         }
                     }
@@ -49,20 +49,21 @@ class AdminController {
                 group: ['status']
             });
 
-            // Commandes récentes (dernières 30 jours)
-            const recentOrders = await Order.findAll({
+            // Revenu récent (derniers 30 jours) basé sur les factures payées
+            const recentOrders = await Invoice.findAll({
                 where: {
-                    created_at: {
+                    status: 'paid',
+                    paid_at: {
                         [Op.gte]: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
                     }
                 },
                 attributes: [
-                    [sequelize.fn('DATE', sequelize.col('created_at')), 'date'],
+                    [sequelize.fn('DATE', sequelize.col('paid_at')), 'date'],
                     [sequelize.fn('COUNT', sequelize.col('id')), 'count'],
                     [sequelize.fn('SUM', sequelize.col('total_amount')), 'revenue']
                 ],
-                group: [sequelize.fn('DATE', sequelize.col('created_at'))],
-                order: [[sequelize.fn('DATE', sequelize.col('created_at')), 'ASC']]
+                group: [sequelize.fn('DATE', sequelize.col('paid_at'))],
+                order: [[sequelize.fn('DATE', sequelize.col('paid_at')), 'ASC']]
             });
 
             // Nouveaux utilisateurs (derniers 30 jours)

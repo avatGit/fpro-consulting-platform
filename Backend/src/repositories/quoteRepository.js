@@ -21,10 +21,10 @@ class QuoteRepository extends BaseRepository {
         const year = new Date().getFullYear();
         const count = await this.model.count({
             where: {
-                quote_number: { [Op.like]: `Q-${year}-%` }
+                quote_number: { [Op.like]: `DEVIS-${year}-%` }
             }
         });
-        return `Q-${year}-${(count + 1).toString().padStart(6, '0')}`;
+        return `DEVIS-${year}-${(count + 1).toString().padStart(6, '0')}`;
     }
 
     async createWithItems(quoteData, items, transaction) {
