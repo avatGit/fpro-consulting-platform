@@ -637,7 +637,7 @@ function AgentDashboardPage() {
         { id: 'maintenance', label: 'Interventions', icon: <i className="fa-solid fa-screwdriver-wrench"></i> },
         { id: 'rentals', label: 'Locations', icon: <i className="fa-solid fa-key"></i> },
         { id: 'profile', label: 'Mon Profil', icon: <i className="fa-solid fa-user-gear"></i> },
-        { id: 'param', label: 'Paramètres', icon: <i className="fa-solid fa-gears"></i> },
+
     ]
 
     const filteredOrders = orders.filter(o =>

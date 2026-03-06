@@ -95,11 +95,26 @@ You can use the provided batch scripts for convenience:
 - `.\start-frontend.bat`: Launches the React development server.
 - `.\sync-database.bat`: Resets and synchronizes the database schema.
 
-##  Testing
+##  Testing & Demo Accounts
 
-- **Admin Login**: Access the dashboard at `http://localhost:3000/login` using admin credentials.
-- **Audit Logs**: View all administrative actions in the "Logs d'audit" section.
-- **Settings**: Adjust system-wide parameters in the "Paramètres" module.
+To quickly populate your local database with demo accounts, run the following command from the `Backend/` directory:
+
+```bash
+npm run db:seed:demo
+```
+*(Alternatively, you can run `node seed_demo_users.js` directly form the `Backend/` folder).*
+
+This will create the following ready-to-use demo accounts:
+
+| Role       | Email                | Password      |
+|------------|----------------------|---------------|
+| **Admin**  | `admin@demo.fpro`    | `Admin@2026`  |
+| **Agent**  | `agent@demo.fpro`    | `Agent@2026`  |
+| **Client** | `client@demo.fpro`   | `Client@2026` |
+
+- **Logins**: Access the dashboards at `http://localhost:3000/login` using any of the credentials above.
+- **Audit Logs**: View all administrative actions in the "Logs d'audit" section (Admin only).
+- **Settings**: Adjust system-wide parameters in the "Paramètres" module (Admin only).
 
 ---
 © 2026 F-PRO Consulting Platform. All rights reserved.

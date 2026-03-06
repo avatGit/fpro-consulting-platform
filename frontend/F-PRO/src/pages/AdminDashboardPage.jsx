@@ -1995,67 +1995,6 @@ function AdminDashboardPage() {
         );
     };
 
-    const renderSettings = () => {
-        const groupedSettings = settings.reduce((acc, setting) => {
-            const category = setting.category || 'general';
-            if (!acc[category]) acc[category] = [];
-            acc[category].push(setting);
-            return acc;
-        }, {});
-
-        return (
-            <div className="dashboard-container">
-                <div className="dashboard-section card">
-                    <div className="section-header">
-                        <div>
-                            <h2>Paramètres Système</h2>
-                            <p style={{ color: '#A3AED0', fontSize: '14px', marginTop: '5px' }}>
-                                Configuration de la plateforme
-                            </p>
-                        </div>
-                        <button className="btn btn-primary" onClick={() => adminApi.initDefaultSettings()}>
-                            <i className="fa-solid fa-sync"></i> Initialiser Paramètres
-                        </button>
-                    </div>
-
-                    <div className="settings-container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px' }}>
-                        {Object.entries(groupedSettings).map(([category, categorySettings]) => (
-                            <div key={category} className="settings-category card" style={{ padding: '20px', border: '1px solid #F4F7FE', borderRadius: '15px' }}>
-                                <h3 style={{ textTransform: 'capitalize', color: '#2B3674', marginBottom: '15px', borderBottom: '1px solid #F4F7FE', paddingBottom: '10px' }}>
-                                    {category}
-                                </h3>
-                                <div className="settings-list" style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                                    {categorySettings.map((setting) => (
-                                        <div key={setting.id} className="setting-item">
-                                            <div className="setting-info" style={{ marginBottom: '5px' }}>
-                                                <h4 style={{ fontSize: '14px', fontWeight: '600', color: '#2B3674' }}>{setting.key}</h4>
-                                                <p style={{ fontSize: '12px', color: '#A3AED0' }}>{setting.description}</p>
-                                            </div>
-                                            <div className="setting-value">
-                                                <input
-                                                    type={setting.type === 'number' ? 'number' : 'text'}
-                                                    value={setting.value}
-                                                    className="form-control"
-                                                    style={{ width: '100%', padding: '10px', borderRadius: '10px', border: '1px solid #E9EDF7', background: '#F4F7FE' }}
-                                                    onChange={(e) => {
-                                                        const newSettings = settings.map(s =>
-                                                            s.id === setting.id ? { ...s, value: e.target.value } : s
-                                                        );
-                                                        setSettings(newSettings);
-                                                    }}
-                                                    onBlur={() => adminApi.updateSetting(setting.key, setting.value)}
-                                                />
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        );
-    };
 
     const renderOrders = () => {
         const filteredOrders = orders.filter(order => {
@@ -2430,7 +2369,6 @@ function AdminDashboardPage() {
             case 'quotes': return 'Gestion des Devis';
             case 'invoices': return 'Gestion des Factures';
             case 'audit': return 'Journal des Connexions';
-            case 'settings': return 'Paramètres';
             case 'orders': return 'Gestion des Commandes';
             case 'products': return 'Gestion des Stocks';
             case 'maintenance': return 'Interventions Maintenance';
@@ -2540,17 +2478,6 @@ function AdminDashboardPage() {
                     </button>
 
                     <button
-                        className={`admin-nav-item ${activeModule === 'settings' ? 'active' : ''}`}
-                        onClick={() => setActiveModule('settings')}
-                    >
-                        <div className="nav-icon-wrapper">
-                            <i className="fa-solid fa-sliders"></i>
-                        </div>
-                        <span className="nav-label">Paramètres</span>
-                        <span className="nav-arrow">›</span>
-                    </button>
-
-                    <button
                         className={`admin-nav-item ${activeModule === 'profile' ? 'active' : ''}`}
                         onClick={() => setActiveModule('profile')}
                     >
@@ -2621,7 +2548,7 @@ function AdminDashboardPage() {
                             {activeModule === 'quotes' && renderQuotes()}
                             {activeModule === 'invoices' && renderInvoices()}
                             {activeModule === 'audit' && renderAuditLogs()}
-                            {activeModule === 'settings' && renderSettings()}
+
                             {activeModule === 'orders' && renderOrders()}
                             {activeModule === 'products' && renderProducts()}
                             {activeModule === 'maintenance' && renderMaintenance()}

@@ -10,6 +10,7 @@
     "db:sync": "node -e \"require('./src/models').syncModels({force: true})\"",
     "db:sync:alter": "node -e \"require('./src/models').syncModels({alter: true})\"",
     "db:seed": "node -e \"require('./src/seedData')()\"",
+    "db:seed:demo": "node seed_demo_users.js",
     "logs:clear": "rm -rf logs/*.log || del /Q logs\\*.log"
   },
   "keywords": [
