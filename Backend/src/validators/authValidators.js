@@ -49,7 +49,7 @@ const loginSchema = Joi.object({
  */
 const updateProfileSchema = Joi.object({
   first_name: Joi.string().min(2).max(100).optional(),
-  last_name: Joi.string().min(2).max(100).optional(),
+  last_name: Joi.string().allow('').max(100).optional(),
   phone: Joi.string().max(20).optional(),
   email: Joi.string().email().optional()
     .messages({

@@ -1086,13 +1086,9 @@ function AdminDashboardPage() {
                 }}>
                     <div className="form-section">
                         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '16px' }}>
-                            <div className="form-group">
-                                <label className="form-group-label">Prénom</label>
-                                <input name="first_name" defaultValue={user?.first_name} required className="premium-input" placeholder="Prénom" />
-                            </div>
-                            <div className="form-group">
-                                <label className="form-group-label">Nom</label>
-                                <input name="last_name" defaultValue={user?.last_name} required className="premium-input" placeholder="Nom" />
+                            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                <label className="form-group-label">Nom complet</label>
+                                <input name="first_name" defaultValue={user?.first_name} required className="premium-input" placeholder="Nom complet" />
                             </div>
                         </div>
 
@@ -1252,22 +1248,13 @@ function AdminDashboardPage() {
                             {editProfileMode ? (
                                 <form onSubmit={handleUpdateProfile}>
                                     <div className="details-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
-                                        <div className="form-group">
-                                            <label className="form-group-label">Prénom</label>
+                                        <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                            <label className="form-group-label">Nom complet</label>
                                             <input
                                                 type="text"
                                                 className="premium-input"
                                                 value={profileFormData.first_name}
                                                 onChange={(e) => setProfileFormData({ ...profileFormData, first_name: e.target.value })}
-                                            />
-                                        </div>
-                                        <div className="form-group">
-                                            <label className="form-group-label">Nom</label>
-                                            <input
-                                                type="text"
-                                                className="premium-input"
-                                                value={profileFormData.last_name}
-                                                onChange={(e) => setProfileFormData({ ...profileFormData, last_name: e.target.value })}
                                             />
                                         </div>
                                         <div className="form-group">

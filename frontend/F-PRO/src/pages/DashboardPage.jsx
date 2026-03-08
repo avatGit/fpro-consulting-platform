@@ -1159,13 +1159,13 @@ function DashboardPage() {
                                     </button>
                                 </div>
                             </div>
-                        ) : (
+                        ) : quotes.length === 0 ? (
                             <div className="devis-empty-state">
                                 <div className="empty-icon">📄</div>
                                 <h3 className="empty-title">Aucun devis généré</h3>
                                 <p className="empty-message">Ajoutez des produits à votre panier et générez un devis pour le voir apparaître ici.</p>
                             </div>
-                        )}
+                        ) : null}
 
                         {/* Recent Quotes List (Integrated below if needed, or keeping it clean) */}
                         {quotes.length > 0 && !currentDevis && (
@@ -1339,22 +1339,13 @@ function DashboardPage() {
                                     {editProfileMode ? (
                                         <form onSubmit={handleUpdateProfile} className="profile-edit-form">
                                             <div className="details-grid">
-                                                <div className="form-group">
-                                                    <label>Prénom</label>
+                                                <div className="form-group" style={{ gridColumn: '1 / -1' }}>
+                                                    <label>Nom complet</label>
                                                     <input
                                                         type="text"
                                                         className="form-input"
                                                         value={profileFormData.first_name}
                                                         onChange={(e) => setProfileFormData({ ...profileFormData, first_name: e.target.value })}
-                                                    />
-                                                </div>
-                                                <div className="form-group">
-                                                    <label>Nom</label>
-                                                    <input
-                                                        type="text"
-                                                        className="form-input"
-                                                        value={profileFormData.last_name}
-                                                        onChange={(e) => setProfileFormData({ ...profileFormData, last_name: e.target.value })}
                                                     />
                                                 </div>
                                                 <div className="form-group">

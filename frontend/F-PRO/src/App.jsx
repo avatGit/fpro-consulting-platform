@@ -5,7 +5,6 @@ import HomePage from './pages/HomePage'
 import RegisterPage from './pages/RegisterPage'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
-import AdminLoginPage from './pages/AdminLoginPage'
 import AdminDashboardPage from './pages/AdminDashboardPage'
 import AgentDashboardPage from './pages/AgentDashboardPage'
 import TechnicianDashboardPage from './pages/TechnicianDashboardPage'
@@ -77,7 +76,6 @@ function App() {
                     } />
 
                     {/* Legacy redirect or alternate paths */}
-                    <Route path="/admin/login" element={<AdminLoginPage />} />
                     <Route path="/admin/dashboard" element={<Navigate to="/admin" replace />} />
                 </Routes>
             </SocketProvider>

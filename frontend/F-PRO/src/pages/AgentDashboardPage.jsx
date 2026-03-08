@@ -34,27 +34,17 @@ function AgentDashboardPage() {
     const [maintenanceRequests, setMaintenanceRequests] = useState([])
     const [technicians, setTechnicians] = useState([])
     const [showTechnicianModal, setShowTechnicianModal] = useState(false)
-    const [showQuoteModal, setShowQuoteModal] = useState(false)
     const [selectedMaintId, setSelectedMaintId] = useState(null)
     const [searchTerm, setSearchTerm] = useState('')
     const [showRentalModal, setShowRentalModal] = useState(false)
     const [editingRental, setEditingRental] = useState(null)
 
-    // Manual Quote State
-    const [newQuoteData, setNewQuoteData] = useState({
-        userId: '',
-        companyId: '', // Optional/derived
-        items: [{ product_id: '', quantity: 1, unit_price: 0 }]
-    })
-
     const [stats, setStats] = useState({
         activeRequests: 0,
-        acceptedQuotes: 0,
         ordersInProgress: 0,
         urgencies: 0
     })
     const [allInterventions, setAllInterventions] = useState([])
-    const [quotes, setQuotes] = useState([])
     const [clients, setClients] = useState([])
     const [rentals, setRentals] = useState([])
 
@@ -108,7 +98,6 @@ function AgentDashboardPage() {
                 api.get('/orders/all'),
                 api.get('/maintenance/all'),
                 api.get('/maintenance/technicians/available'),
-                api.get('/quotes/all/quotes'),
                 api.get('/users/clients'),
                 api.get('/rentals/all')
             ])
@@ -117,17 +106,13 @@ function AgentDashboardPage() {
             const rawOrders = results[1].status === 'fulfilled' ? (results[1].value.data?.data || []) : []
             const rawMaint = results[2].status === 'fulfilled' ? (results[2].value.data?.data || []) : []
             const rawTechs = results[3].status === 'fulfilled' ? (results[3].value.data?.data || []) : []
-            const rawQuotes = results[4].status === 'fulfilled' ? (results[4].value.data?.data?.quotes || []) : []
-            const rawClients = results[5].status === 'fulfilled' ? (results[5].value.data?.data || []) : []
-            const rawRentals = results[6].status === 'fulfilled' ? (results[6].value.data?.data || []) : []
-
-            if (results[4].status === 'rejected') console.warn('Quotes access denied or failed:', results[4].reason)
+            const rawClients = results[4].status === 'fulfilled' ? (results[4].value.data?.data || []) : []
+            const rawRentals = results[5].status === 'fulfilled' ? (results[5].value.data?.data || []) : []
 
             setProducts(rawProds)
             setOrders(rawOrders)
             setMaintenanceRequests(rawMaint)
             setTechnicians(rawTechs)
-            setQuotes(rawQuotes)
             setClients(rawClients)
             setRentals(rawRentals)
 
@@ -147,7 +132,6 @@ function AgentDashboardPage() {
                     const status = m.status?.toLowerCase()
                     return status === 'new' || status === 'assigned'
                 }).length : 0,
-                acceptedQuotes: Array.isArray(rawQuotes) ? rawQuotes.filter(q => q.status === 'accepted').length : 0,
                 ordersInProgress: Array.isArray(rawOrders) ? rawOrders.filter(o => {
                     const status = o.status?.toLowerCase()
                     return status === 'validated' || status === 'processing' || status === 'shipped'
@@ -196,28 +180,6 @@ function AgentDashboardPage() {
         }
     }
 
-    const handleApproveQuote = async (quoteId) => {
-        if (!window.confirm('Êtes-vous sûr de vouloir approuver ce devis ? Cela générera automatiquement une commande.')) return;
-        try {
-            await api.post(`/quotes/${quoteId}/approve`)
-            fetchAgentData()
-            alert('Devis approuvé et commande générée !')
-        } catch (error) {
-            alert('Erreur lors de l\'approbation')
-        }
-    }
-
-    const handleRejectQuote = async (quoteId) => {
-        const reason = prompt('Veuillez indiquer la raison du rejet :');
-        if (!reason) return;
-        try {
-            await api.post(`/quotes/${quoteId}/reject`, { reason })
-            fetchAgentData()
-            alert('Devis rejeté.')
-        } catch (error) {
-            alert('Erreur lors du rejet')
-        }
-    }
 
     const handleCancelOrder = async (orderId) => {
         const reason = prompt('Veuillez indiquer la raison de l\'annulation :');
@@ -328,48 +290,6 @@ function AgentDashboardPage() {
     }
 
 
-    const handleCreateQuote = async () => {
-        try {
-            // Simplified validation
-            if (!newQuoteData.userId || newQuoteData.items.length === 0) {
-                alert('Veuillez sélectionner un client et au moins un article.')
-                return
-            }
-            // For simplicity, assuming product selection fills price. In real app, selecting product updates unit_price.
-            // Here we just send what we have.
-            await api.post('/quotes/manual', newQuoteData)
-            setShowQuoteModal(false)
-            fetchAgentData()
-            alert('Devis créé avec succès !')
-            setNewQuoteData({ userId: '', companyId: '', items: [{ product_id: '', quantity: 1, unit_price: 0 }] })
-        } catch (error) {
-            console.error(error);
-            alert('Erreur lors de la création du devis')
-        }
-    }
-
-    const handleAddQuoteItem = () => {
-        setNewQuoteData({
-            ...newQuoteData,
-            items: [...newQuoteData.items, { product_id: '', quantity: 1, unit_price: 0 }]
-        })
-    }
-
-    const handleQuoteItemChange = (index, field, value) => {
-        const newItems = [...newQuoteData.items]
-        newItems[index][field] = value
-
-        // Auto-fill price if product changes
-        if (field === 'product_id') {
-            const product = products.find(p => p.id === value)
-            if (product) {
-                newItems[index].unit_price = product.price
-            }
-        }
-
-        setNewQuoteData({ ...newQuoteData, items: newItems })
-    }
-
     const handleExportOrders = async () => {
         try {
             const response = await api.get('/reports/orders', { responseType: 'blob' });
@@ -433,7 +353,6 @@ function AgentDashboardPage() {
         if (!user) return null;
 
         const sidebarStats = [
-            { label: 'Devis Acceptés', count: stats.acceptedQuotes, icon: 'fa-file-invoice' },
             { label: 'Commandes', count: stats.ordersInProgress, icon: 'fa-shopping-basket' }
         ];
 
@@ -490,23 +409,13 @@ function AgentDashboardPage() {
                             {editProfileMode ? (
                                 <form onSubmit={handleUpdateProfile}>
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
-                                        <div className="form-group-op">
-                                            <label style={{ display: 'block', marginBottom: '8px', color: '#2B3674', fontWeight: '700', fontSize: '14px' }}>Prénom</label>
+                                        <div className="form-group-op" style={{ gridColumn: '1 / -1' }}>
+                                            <label style={{ display: 'block', marginBottom: '8px', color: '#2B3674', fontWeight: '700', fontSize: '14px' }}>Nom complet</label>
                                             <input
                                                 type="text"
                                                 className="form-input-op"
                                                 value={profileFormData.first_name}
                                                 onChange={(e) => setProfileFormData({ ...profileFormData, first_name: e.target.value })}
-                                                style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: '#F4F7FE' }}
-                                            />
-                                        </div>
-                                        <div className="form-group-op">
-                                            <label style={{ display: 'block', marginBottom: '8px', color: '#2B3674', fontWeight: '700', fontSize: '14px' }}>Nom</label>
-                                            <input
-                                                type="text"
-                                                className="form-input-op"
-                                                value={profileFormData.last_name}
-                                                onChange={(e) => setProfileFormData({ ...profileFormData, last_name: e.target.value })}
                                                 style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: '#F4F7FE' }}
                                             />
                                         </div>
@@ -631,7 +540,6 @@ function AgentDashboardPage() {
     const menuItems = [
         { id: 'dashboard', label: 'Tableau de bord', icon: <i className="fa-solid fa-chart-pie"></i> },
         { id: 'clients', label: 'Clients', icon: <i className="fa-solid fa-users"></i> },
-        { id: 'devis', label: 'Gestion des Devis', icon: <i className="fa-solid fa-file-invoice"></i> },
         { id: 'orders', label: 'Commandes', icon: <i className="fa-solid fa-shopping-basket"></i> },
         { id: 'reports', label: 'Rapports', icon: <i className="fa-solid fa-file-export"></i> },
         { id: 'maintenance', label: 'Interventions', icon: <i className="fa-solid fa-screwdriver-wrench"></i> },
@@ -732,18 +640,7 @@ function AgentDashboardPage() {
                                     </div>
                                     <div className="stat-bottom-bar" style={{ background: '#F59E0B' }}></div>
                                 </div>
-                                <div className="stat-card">
-                                    <div className="stat-main-row">
-                                        <div className="stat-icon-wrapper" style={{ color: '#4318FF' }}>
-                                            <i className="fa-solid fa-file-circle-check"></i>
-                                        </div>
-                                        <div className="stat-info">
-                                            <h3>Devis Confirmés</h3>
-                                            <div className="stat-number">{stats.acceptedQuotes}</div>
-                                        </div>
-                                    </div>
-                                    <div className="stat-bottom-bar" style={{ background: '#4318FF' }}></div>
-                                </div>
+
                                 <div className="stat-card">
                                     <div className="stat-main-row">
                                         <div className="stat-icon-wrapper" style={{ color: '#01B574' }}>
@@ -1028,61 +925,7 @@ function AgentDashboardPage() {
                         </div>
                     )}
 
-                    {activeMenu === 'devis' && (
-                        <div className="devis-management-view">
-                            <div className="filter-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '16px 24px', borderRadius: '16px', marginBottom: '24px', boxShadow: 'var(--agent-shadow)', gap: '16px' }}>
-                                <div style={{ display: 'flex', gap: '12px', flex: 1 }}>
-                                    <div className="search-box" style={{ width: '240px' }}>
-                                        <span className="search-icon"><i className="fa-solid fa-magnifying-glass"></i></span>
-                                        <input type="text" placeholder="Recherche ref..." className="search-input-field" />
-                                    </div>
-                                    <select style={{ border: 'none', background: '#F4F7FE', padding: '10px 16px', borderRadius: '12px', color: '#2B3674', fontWeight: 'bold' }}>
-                                        <option>Filtrer par statut</option>
-                                        <option value="pending">En Attente</option>
-                                        <option value="accepted">Accepté</option>
-                                        <option value="refused">Refusé</option>
-                                    </select>
-                                </div>
-                                <button className="btn-operational" onClick={() => setShowQuoteModal(true)} style={{ marginRight: '8px', background: '#4318FF', color: 'white' }}>+ Créer Devis</button>
-                                <button className="btn-operational" onClick={fetchAgentData}>Actualiser</button>
-                            </div>
-                            <div className="agent-table-container">
-                                <table className="agent-table">
-                                    <thead>
-                                        <tr>
-                                            <th>Référence</th>
-                                            <th>Client</th>
-                                            <th>Montant</th>
-                                            <th>Statut</th>
-                                            <th>Date</th>
-                                            <th>Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {quotes.length > 0 ? quotes.map(quote => (
-                                            <tr key={quote.id}>
-                                                <td><code>{quote.id.substring(0, 8).toUpperCase()}</code></td>
-                                                <td>{quote.user?.first_name} {quote.user?.last_name || 'Client'}</td>
-                                                <td style={{ fontWeight: '700' }}>{quote.total_amount} €</td>
-                                                <td style={{ color: '#A3AED0' }}>{new Date(quote.createdAt || quote.created_at).toLocaleDateString()}</td>
-                                                <td>
-                                                    <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                                        <a href={`${SERVER_URL}/api/quotes/${quote.id}/pdf`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', fontSize: '14px', marginRight: '4px' }} title="Télécharger PDF">
-                                                            <i className="fa-solid fa-file-pdf"></i>
-                                                        </a>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )) : (
-                                            <tr>
-                                                <td colSpan="6" style={{ textAlign: 'center', padding: '20px', color: '#A3AED0' }}>Aucun devis trouvé</td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    )}
+
 
 
                     {activeMenu === 'reports' && (
@@ -1142,61 +985,7 @@ function AgentDashboardPage() {
             )
             }
 
-            {
-                showQuoteModal && (
-                    <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100 }} onClick={() => setShowQuoteModal(false)}>
-                        <div className="modal-content" style={{ background: 'white', padding: '32px', borderRadius: '24px', width: '600px', maxWidth: '95%', maxHeight: '80vh', overflowY: 'auto', boxShadow: '0 20px 40px rgba(0,0,0,0.2)' }} onClick={e => e.stopPropagation()}>
-                            <h2 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '24px', color: '#2B3674' }}>Créer un Devis</h2>
 
-                            <div style={{ marginBottom: '20px' }}>
-                                <label style={{ display: 'block', marginBottom: '8px', color: '#2B3674', fontWeight: '700' }}>Client</label>
-                                <select
-                                    value={newQuoteData.userId}
-                                    onChange={(e) => {
-                                        const client = clients.find(c => c.id === e.target.value);
-                                        setNewQuoteData({ ...newQuoteData, userId: e.target.value, companyId: client?.company_id || '' })
-                                    }}
-                                    style={{ width: '100%', padding: '12px', borderRadius: '12px', border: '1px solid #E2E8F0', background: '#F4F7FE' }}
-                                >
-                                    <option value="">Sélectionner un client</option>
-                                    {clients.map(client => (
-                                        <option key={client.id} value={client.id}>{client.first_name} {client.last_name} ({client.company?.name || 'Particulier'})</option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <h3 style={{ fontSize: '16px', color: '#2B3674', marginBottom: '12px' }}>Articles</h3>
-                            {newQuoteData.items.map((item, index) => (
-                                <div key={index} style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
-                                    <select
-                                        value={item.product_id}
-                                        onChange={(e) => handleQuoteItemChange(index, 'product_id', e.target.value)}
-                                        style={{ flex: 2, padding: '10px', borderRadius: '8px', border: '1px solid #E2E8F0' }}
-                                    >
-                                        <option value="">Produit</option>
-                                        {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.price}€)</option>)}
-                                    </select>
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        value={item.quantity}
-                                        onChange={(e) => handleQuoteItemChange(index, 'quantity', parseInt(e.target.value))}
-                                        style={{ width: '60px', padding: '10px', borderRadius: '8px', border: '1px solid #E2E8F0' }}
-                                    />
-                                    <span style={{ fontWeight: 'bold', width: '80px', textAlign: 'right' }}>{(item.unit_price * item.quantity).toFixed(2)}€</span>
-                                </div>
-                            ))}
-
-                            <button onClick={handleAddQuoteItem} style={{ border: 'none', background: 'transparent', color: '#4318FF', fontWeight: '700', cursor: 'pointer', marginBottom: '8px' }}>+ Ajouter un produit</button>
-
-                            <div style={{ marginTop: '24px', display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-                                <button className="btn-operational btn-secondary-op" onClick={() => setShowQuoteModal(false)}>Annuler</button>
-                                <button className="btn-operational btn-primary-op" onClick={handleCreateQuote} style={{ background: '#4318FF', color: 'white' }}>Créer Devis</button>
-                            </div>
-                        </div>
-                    </div>
-                )
-            }
 
             {showRentalModal && (
                 <div className="modal-overlay" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1100 }} onClick={() => setShowRentalModal(false)}>

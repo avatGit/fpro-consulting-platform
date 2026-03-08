@@ -44,7 +44,7 @@ const register = async (req, res) => {
 
     const userData = {
       first_name: companyName, // Use company name as first_name
-      last_name: 'Client', // Default last name
+      last_name: '', // Default last name empty
       email: email,
       password: password,
       phone: phone

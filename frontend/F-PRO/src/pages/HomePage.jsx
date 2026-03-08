@@ -1,12 +1,9 @@
-import React, { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import React from 'react'
+import { Link } from 'react-router-dom'
 import Navbar from '../components/Navbar'
 import './HomePage.css'
 
 function HomePage() {
-    const navigate = useNavigate()
-    const [clickCount, setClickCount] = useState(0)
-    const [clickTimer, setClickTimer] = useState(null)
     const services = [
         {
             id: 1,
@@ -27,27 +24,6 @@ function HomePage() {
             description: 'Développement web, applications et solutions sur mesure'
         }
     ]
-
-    const handleFooterDoubleClick = () => {
-        setClickCount(prev => prev + 1)
-
-        if (clickTimer) clearTimeout(clickTimer)
-
-        const timer = setTimeout(() => {
-            if (clickCount + 1 >= 2) {
-                navigate('/admin/login')
-            }
-            setClickCount(0)
-        }, 300)
-
-        setClickTimer(timer)
-    }
-
-    useEffect(() => {
-        return () => {
-            if (clickTimer) clearTimeout(clickTimer)
-        }
-    }, [clickTimer])
 
     return (
         <div className="home-page">
@@ -121,11 +97,7 @@ function HomePage() {
             {/* Footer */}
             <footer className="footer">
                 <div className="container">
-                    <p
-                        className="footer-text"
-                        onClick={handleFooterDoubleClick}
-                        style={{ cursor: 'default', userSelect: 'none' }}
-                    >
+                    <p className="footer-text">
                         © 2026 F-PRO CONSULTING. Tous droits réservés.
                     </p>
                 </div>
