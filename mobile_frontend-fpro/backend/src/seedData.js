@@ -17,29 +17,29 @@ const seedData = async () => {
                 address: '123 Business Ave',
                 city: 'Ouagadougou'
             }, { transaction });
-            console.log('✅ Entreprise créée');
+            console.log('Entreprise créée');
         } else {
-            console.log('ℹ️ Entreprise existe déjà');
+            console.log('Entreprise existe déjà');
         }
 
         // 2. Vérifier/Créer l'Admin
         let admin = await User.findOne({
-            where: { email: 'dankfd99@gmail.com' }
+            where: { email: 'admin@demo.com' }
         });
 
         if (!admin) {
             admin = await User.create({
-                email: 'dankfd99@gmail.com',
-                password_hash: 'Admin@123', // 🔐 Hash du mot de passe
+                email: 'admin@demo.com',
+                password_hash: 'Admin@2026', 
                 first_name: 'Super',
                 last_name: 'Admin',
                 role: 'admin',
                 company_id: null,
                 is_active: true
             }, { transaction });
-            console.log('✅ Admin créé');
+            console.log('Admin créé');
         } else {
-            console.log('ℹ️ Admin existe déjà');
+            console.log('Admin existe déjà');
         }
 
         // 3. Vérifier/Créer le technicien
@@ -57,7 +57,7 @@ const seedData = async () => {
                 company_id: company.id,
                 is_active: true
             }, { transaction });
-            console.log('✅ Technicien créé');
+            console.log('Technicien créé');
 
             // Créer le profil Technician associé
             await Technician.create({
@@ -65,9 +65,9 @@ const seedData = async () => {
                 skills: ['Hardware', 'Networking'],
                 is_available: true
             }, { transaction });
-            console.log('✅ Profil technician créé');
+            console.log('Profil technician créé');
         } else {
-            console.log('ℹ️ Technicien existe déjà');
+            console.log('Technicien existe déjà');
         }
 
         // 4. Vérifier/Créer les produits (basé sur SKU unique)
@@ -104,18 +104,18 @@ const seedData = async () => {
 
             if (!existingProduct) {
                 await Product.create(productData, { transaction });
-                console.log(`✅ Produit créé: ${productData.name}`);
+                console.log(`Produit créé: ${productData.name}`);
             } else {
-                console.log(`ℹ️ Produit existe déjà: ${productData.name}`);
+                console.log(`Produit existe déjà: ${productData.name}`);
             }
         }
 
         await transaction.commit();
-        console.log('🎉 Seed data successfully inserted');
+        console.log('Seed data successfully inserted');
 
     } catch (error) {
         await transaction.rollback();
-        console.error('❌ Error seeding data:', error);
+        console.error('Error seeding data:', error);
     }
 };
 
