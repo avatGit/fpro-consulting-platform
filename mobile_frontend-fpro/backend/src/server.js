@@ -1,0 +1,276 @@
+const express = require('express');
+const dotenv = require('dotenv');
+const cors = require('cors');
+const helmet = require('helmet');
+const morgan = require('morgan');
+const { testConnection } = require('./config/database');
+const { syncModels } = require('./models');
+const ResponseHandler = require('./utils/responseHandler');
+const logger = require('./utils/logger');
+const { swaggerUi, specs } = require('./config/swagger');
+const { apiLimiter, authLimiter } = require('./middleware/rateLimiter');
+const { sanitizeAll, blockMaliciousInput } = require('./middleware/sanitizer');
+const cronService = require('./services/cronService');
+
+// Charger les variables d'environnement
+dotenv.config();
+
+// Initialiser l'application Express
+const app = express();
+
+// CORS - Configure les origines autorisées
+/* app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*', //'http://localhost:5001',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  optionsSuccessStatus: 200
+})); */
+const corsOptions = {
+  // On récupère l'origine de la requête et on l'autorise si elle existe
+  origin: function (origin, callback) {
+    // En développement, on accepte tout (origin est undefined pour les outils comme curl)
+    if (!origin || origin.startsWith('http://localhost')) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
+// Helmet - Sécurise les headers HTTP
+/* app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+  contentSecurityPolicy: false, // Désactive la CSP en développement pour Flutter
+}));
+ */
+
+
+
+// MIDDLEWARES DE PARSING
+
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+
+// SECURITY MIDDLEWARE (Sprint 6)
+
+
+// Rate limiting - Apply to all API routes
+app.use('/api/', apiLimiter);
+
+// Input sanitization - Prevent XSS and injection attacks
+app.use(sanitizeAll);
+app.use(blockMaliciousInput);
+
+
+// LOGGING
+
+
+// Morgan - Logs des requêtes HTTP
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
+}
+
+
+// ROUTES DE BASE
+
+
+// Route de santé (Health Check)
+app.get('/', (req, res) => {
+  ResponseHandler.success(res, {
+    service: 'F-PRO CONSULTING API',
+    version: '1.0.0',
+    status: 'running',
+    environment: process.env.NODE_ENV
+  }, 'Bienvenue sur l\'API F-PRO CONSULTING');
+});
+
+// Route de vérification de santé
+app.get('/api/health', async (req, res) => {
+  try {
+    // Vérifier la connexion à la base de données
+    await sequelize.authenticate();
+
+    ResponseHandler.success(res, {
+      status: 'healthy',
+      database: 'connected',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+      memory: process.memoryUsage()
+    }, 'Service opérationnel');
+  } catch (error) {
+    ResponseHandler.error(res, 'Service dégradé', 503, {
+      database: 'disconnected',
+      error: error.message
+    });
+  }
+});
+
+
+// ROUTES API
+
+
+// Routes d'authentification (with strict rate limiting)
+const authRoutes = require('./routes/authRoutes');
+app.use('/api/auth', authLimiter, authRoutes);
+
+// Documentation API
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(specs));
+
+// Routes Cart, Quote, Order (Sprint 3)
+const cartRoutes = require('./routes/cartRoutes');
+const quoteRoutes = require('./routes/quoteRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+
+app.use('/api/cart', cartRoutes);
+app.use('/api/quotes', quoteRoutes);
+app.use('/api/orders', orderRoutes);
+
+// Routes Maintenance, Intervention, Rental (Sprint 4)
+const maintenanceRoutes = require('./routes/maintenanceRoutes');
+const interventionRoutes = require('./routes/interventionRoutes');
+const rentalRoutes = require('./routes/rentalRoutes');
+
+app.use('/api/maintenance', maintenanceRoutes);
+app.use('/api/interventions', interventionRoutes);
+app.use('/api/rentals', rentalRoutes);
+
+// Routes Notifications (Sprint 5)
+// Routes Notifications (Sprint 5)
+const notificationRoutes = require('./routes/notificationRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
+
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/reviews', reviewRoutes);
+
+
+// MANAGEMENT ROUTES (Critical Gaps Fixed)
+
+
+// Product Management
+const productRoutes = require('./routes/productRoutes');
+app.use('/api/products', productRoutes);
+
+// Admin User Management
+const adminUserRoutes = require('./routes/adminUserRoutes');
+app.use('/api/admin/users', adminUserRoutes);
+
+// Company Management
+const companyRoutes = require('./routes/companyRoutes');
+app.use('/api/companies', companyRoutes);
+
+
+// 404 HANDLER
+
+
+app.use((req, res) => {
+  ResponseHandler.notFound(res, `Route ${req.method} ${req.path} non trouvée`);
+});
+
+
+// GESTIONNAIRE D'ERREURS GLOBAL
+
+
+app.use((err, req, res, next) => {
+  logger.error(`Error: ${err.message}`);
+  logger.error(err.stack);
+
+  // Erreur de validation Sequelize
+  if (err.name === 'SequelizeValidationError') {
+    const errors = err.errors.map(e => ({
+      field: e.path,
+      message: e.message
+    }));
+    return ResponseHandler.validationError(res, errors);
+  }
+
+  // Erreur de contrainte unique Sequelize
+  if (err.name === 'SequelizeUniqueConstraintError') {
+    return ResponseHandler.error(res, 'Cette ressource existe déjà', 409);
+  }
+
+  // Erreur JWT
+  if (err.name === 'JsonWebTokenError') {
+    return ResponseHandler.unauthorized(res, 'Token invalide');
+  }
+
+  if (err.name === 'TokenExpiredError') {
+    return ResponseHandler.unauthorized(res, 'Token expiré');
+  }
+
+  // Erreur générique
+  ResponseHandler.serverError(res, err);
+});
+
+
+// DÉMARRAGE DU SERVEUR
+
+
+const PORT = process.env.PORT || 5432;
+
+const startServer = async () => {
+  try {
+    // 1. Tester la connexion à PostgreSQL
+    logger.info('Connexion à la base de données...');
+    const isConnected = await testConnection();
+
+    if (!isConnected) {
+      logger.error(' Impossible de démarrer le serveur sans connexion à la base de données');
+      process.exit(1);
+    }
+
+    // 2. Synchroniser les modèles (uniquement en développement)
+    if (process.env.NODE_ENV === 'development') {
+      logger.info(' Synchronisation des modèles...');
+      await syncModels({ alter: false }); // alter: false pour éviter les erreurs de syncUNIQUE
+      logger.info(' Base de données synchronisée avec succès');
+
+      // Initialize cron jobs (Sprint 5)
+      logger.info(' Initialisation des tâches planifiées...');
+      cronService.initializeCronJobs();
+    }
+
+    // 3. Démarrer le serveur Express
+    app.listen(PORT, () => {
+      logger.info('='.repeat(50));
+      logger.info(` Serveur F-PRO CONSULTING démarré avec succès`);
+      logger.info(` URL: http://localhost:${PORT}`);
+      logger.info(` Environnement: ${process.env.NODE_ENV || 'development'}`);
+      logger.info(` Base de données: ${process.env.DB_NAME}`);
+      logger.info('='.repeat(50));
+    });
+
+  } catch (error) {
+    logger.error(' Erreur critique lors du démarrage du serveur:');
+    logger.error(error);
+    process.exit(1);
+  }
+};
+
+// Gestion des erreurs non capturées
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Arrêter proprement le serveur
+  process.exit(1);
+});
+
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught Exception:', error);
+  process.exit(1);
+});
+
+// Démarrer le serveur
+startServer();
+
+module.exports = app;
