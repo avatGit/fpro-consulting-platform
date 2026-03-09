@@ -1080,7 +1080,7 @@ function DashboardPage() {
                                     </>
                                 ) : (
                                     <div className="no-order-selected">
-                                        <div style={{ fontSize: '3rem', marginBottom: '15px' }}>🔍</div>
+                                        <div style={{ fontSize: '3rem', marginBottom: '15px' }}></div>
                                         <p>Sélectionnez un élément pour voir son état d'avancement</p>
                                     </div>
                                 )}

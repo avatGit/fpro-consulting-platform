@@ -96,8 +96,8 @@ function TechnicianDashboardPage() {
                                 <h3>{i.request?.subject || 'Intervention'}</h3>
                                 <p className="description">{i.request?.description}</p>
                                 <div className="meta">
-                                    <span>📍 {i.request?.location || 'Site client'}</span>
-                                    <span>⏰ {new Date(i.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                                    <span> {i.request?.location || 'Site client'}</span>
+                                    <span> {new Date(i.scheduled_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                                 </div>
                             </div>
                             <div className="card-actions">
